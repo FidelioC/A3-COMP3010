@@ -8,7 +8,7 @@ import uuid
 # 3. Create Chain
 # 4. Add Block
 
-SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
+SILICON_HOST, SILICON_PORT = "130.179.28.37", 8999
 
 
 def announce_gossip(gossip_conn):
