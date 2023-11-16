@@ -17,9 +17,9 @@ SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 def announce_gossip(gossip_conn):
     gossip_message = {
         "type": "GOSSIP",
-        "host": "",
+        "host": "loon.cs.umanitoba.ca",
         "port": 8999,
-        "id": "sadpamsodmoasdmasmd0-13213",
+        "id": str(uuid.uuid4()),
         "name": "HelloWorld!",
     }
     gossip_conn.send(json.dumps(gossip_message).encode())
@@ -29,7 +29,7 @@ def announce_gossip(gossip_conn):
 def gossip(host, port):
     # TODO:
     # 1. connect to one well-known host
-    gossip_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    gossip_conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     gossip_conn.connect((SILICON_HOST, SILICON_PORT))
     print(announce_gossip(gossip_conn))
     # 2. Reply gossip message received
