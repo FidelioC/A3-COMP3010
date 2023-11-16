@@ -17,8 +17,8 @@ SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 def announce_gossip(gossip_conn):
     gossip_message = {
         "type": "GOSSIP",
-        "host": "loon.cs.umanitoba.ca",
-        "port": 8999,
+        "host": "130.179.28.115",
+        "port": 8759,
         "id": str(uuid.uuid4()),
         "name": "HelloWorld!",
     }
