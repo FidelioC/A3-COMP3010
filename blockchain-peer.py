@@ -1,6 +1,7 @@
 import socket
 import json
 import uuid
+import random
 
 # TODO:
 # 1. GOSSIP
@@ -18,8 +19,8 @@ def announce_gossip(gossip_conn):
         "type": "GOSSIP",
         "host": "",
         "port": 8999,
-        "id": str(uuid.uuid4()),
-        "name": "Hello World!",
+        "id": "sadpamsodmoasdmasmd0-13213",
+        "name": "HelloWorld!",
     }
     gossip_conn.send(json.dumps(gossip_message).encode())
     return gossip_conn.recv(4096).decode()
