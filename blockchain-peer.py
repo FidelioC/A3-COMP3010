@@ -1,8 +1,6 @@
 import socket
 import json
 import uuid
-import random
-
 # TODO:
 # 1. GOSSIP
 # 2. Consensus
@@ -11,35 +9,45 @@ import random
 
 # echo '{"type": "GOSSIP", "host": "130.179.28.110", "port": 8999, "id": 1, "name": "Hello World!",}' | nc -u 130.179.28.37 8999
 
+MY_HOST, MY_PORT = "130.179.28.127", 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 
 
-def announce_gossip(gossip_conn):
+def announce_network(my_host, my_port, known_socket):
     gossip_message = {
         "type": "GOSSIP",
-        "host": "130.179.28.115",
-        "port": 8759,
+        "host": my_host,
+        "port": my_port,
         "id": str(uuid.uuid4()),
-        "name": "HelloWorld!",
+        "name": "da!",
     }
-    gossip_conn.send(json.dumps(gossip_message).encode())
-    return gossip_conn.recv(4096).decode()
 
+    known_socket.sendto(json.dumps(gossip_message).encode(), (SILICON_HOST, SILICON_PORT))
 
-def gossip(host, port):
+def gossip(my_host, my_port):
     # TODO:
     # 1. connect to one well-known host
-    gossip_conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    gossip_conn.connect((SILICON_HOST, SILICON_PORT))
-    print(announce_gossip(gossip_conn))
+    known_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    announce_network(my_host, my_port, known_socket)
     # 2. Reply gossip message received
     print()
 
+def my_server(my_host,my_port):
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
+        server_socket.bind((my_host, my_port))
+
+        print(f"Server listening on host {my_host} and PORT {my_port}")
+        gossip(my_host, my_port)
+
+        while True:
+
+            data, addr = server_socket.recvfrom(1024)
+
+            print("\nReceived From ", addr)
+            print(data.decode())
 
 def main():
-    gossip(SILICON_HOST, SILICON_PORT)
-    print("TODO here")
-
+    my_server(MY_HOST, MY_PORT)
 
 if __name__ == "__main__":
     main()
