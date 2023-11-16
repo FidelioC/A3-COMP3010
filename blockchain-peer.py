@@ -4,6 +4,7 @@ import uuid
 import time
 # TODO:
 # 1. GOSSIP
+    # - Drop peer in peer list 1 minute no response
 # 2. Consensus
 # 3. Create Chain
 # 4. Add Block
@@ -51,6 +52,18 @@ def is_peer_list(gossip_message):
     #false if doesn't exist
     return False 
 
+def send_gossip_reply(known_socket, gossip_message):
+    gossip_reply = {
+        "type": "GOSSIP_REPLY",
+        "host": MY_HOST,
+        "port": MY_PORT,
+        "name": "jepz"
+    }
+
+    host_original = gossip_message["host"]
+    port_original = gossip_message["port"]
+    known_socket.sendto(json.dumps(gossip_reply).encode(), (host_original,port_original))
+
 def add_peer_list(gossip_message):
     # add peer to list
     if not is_peer_list(gossip_message):
@@ -63,7 +76,7 @@ def announce_network(my_host, my_port, known_socket, known_host, known_port):
         "host": my_host,
         "port": my_port,
         "id": MY_PEER_ID,
-        "name": "da!",
+        "name": "jepz",
     }
 
     known_socket.sendto(json.dumps(gossip_message).encode(), (known_host, known_port))
@@ -75,14 +88,16 @@ def gossip(my_host, my_port, known_socket, known_host, known_port):
     # 2. Reply gossip message received
     print()
 
-def handle_response(json_response):
+def handle_response(known_socket, json_response):
     print(json_response)
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
         add_peer_list(json_response)
+        send_gossip_reply(known_socket, json_response)
+        # print(print_peers())
     
-    print(print_peers())
 
+    
 def ping_gossip(my_host, my_port, known_socket, elapsed_time):
     duration = 20
     # gossip to 3 different well-known hosts 
@@ -117,7 +132,7 @@ def my_server(my_host, my_port):
             json_data = json.loads(data)
             print("\nReceived From ", addr)
 
-            handle_response(json_data)
+            handle_response(known_socket, json_data)
 
 def main():
     my_server(MY_HOST, MY_PORT)
