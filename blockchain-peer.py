@@ -10,13 +10,13 @@ import uuid
 
 # echo '{"type": "GOSSIP", "host": "130.179.28.110", "port": 8999, "id": 1, "name": "Hello World!",}' | nc -u 130.179.28.37 8999
 
-SILICON_HOST, SILICON_PORT = "", 8999
+SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 
 
 def announce_gossip(gossip_conn):
     gossip_message = {
         "type": "GOSSIP",
-        "host": "130.179.28.110",
+        "host": "woodpecker.cs.umanitoba.ca",
         "port": 8999,
         "id": str(uuid.uuid4()),
         "name": "Hello World!",
