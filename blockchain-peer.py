@@ -1,6 +1,7 @@
 import socket
 import json
 import uuid
+import time
 # TODO:
 # 1. GOSSIP
 # 2. Consensus
@@ -11,40 +12,112 @@ import uuid
 
 MY_HOST, MY_PORT = "130.179.28.127", 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
+EAGLE_HOST, EAGLE_PORT = "eagle.cs.umanitoba.ca", 8999
+ROBIN_HOST, ROBIN_PORT = "robin.cs.umanitoba.ca", 8999
+MY_PEER_ID = str(uuid.uuid4())
 
+class Peer:
+    def __init__(self, peer_host = None, peer_port = None, peer_name = None, peer_id = None):
+        self.peer_host = peer_host
+        self.peer_port = peer_port
+        self.peer_name = peer_name
+        self.peer_id = peer_id
+    
+    def to_json(self):
+        return {
+            "peer_host": self.peer_host,
+            "peer_port": self.peer_port,
+            "peer_name": self.peer_name,
+            "peer_id": self.peer_id
+        }
+    
+    def __str__(self):
+        return str(self.to_json())
+    
+peer_obj_list = []
 
-def announce_network(my_host, my_port, known_socket):
+def print_peers():
+    print("CURRENT PEERS IN THE LIST:")
+    for peer in peer_obj_list:
+        if peer != None:
+            print(peer)
+
+def is_peer_list(gossip_message):
+    gossip_id = gossip_message["id"]
+    for peer in peer_obj_list:
+        if peer.peer_id == gossip_id:
+            return True #true if duplicate
+        
+    #false if doesn't exist
+    return False 
+
+def add_peer_list(gossip_message):
+    # add peer to list
+    if not is_peer_list(gossip_message):
+        peer_object = Peer(gossip_message["host"], gossip_message["port"], gossip_message["name"], gossip_message["id"])
+        peer_obj_list.append(peer_object)
+
+def announce_network(my_host, my_port, known_socket, known_host, known_port):
     gossip_message = {
         "type": "GOSSIP",
         "host": my_host,
         "port": my_port,
-        "id": str(uuid.uuid4()),
+        "id": MY_PEER_ID,
         "name": "da!",
     }
 
-    known_socket.sendto(json.dumps(gossip_message).encode(), (SILICON_HOST, SILICON_PORT))
+    known_socket.sendto(json.dumps(gossip_message).encode(), (known_host, known_port))
 
-def gossip(my_host, my_port):
+def gossip(my_host, my_port, known_socket, known_host, known_port):
     # TODO:
     # 1. connect to one well-known host
-    known_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    announce_network(my_host, my_port, known_socket)
+    announce_network(my_host, my_port, known_socket, known_host, known_port)
     # 2. Reply gossip message received
     print()
 
-def my_server(my_host,my_port):
+def handle_response(json_response):
+    print(json_response)
+    msg_type = json_response["type"]
+    if msg_type == "GOSSIP":
+        add_peer_list(json_response)
+    
+    print(print_peers())
+
+def ping_gossip(my_host, my_port, known_socket, elapsed_time):
+    duration = 20
+    # gossip to 3 different well-known hosts 
+    if elapsed_time >= duration:
+        gossip(my_host, my_port, known_socket, SILICON_HOST, SILICON_PORT)
+        gossip(my_host, my_port, known_socket, EAGLE_HOST, EAGLE_PORT)
+        gossip(my_host, my_port, known_socket, ROBIN_HOST, ROBIN_PORT)
+        return True
+
+def my_server(my_host, my_port):
+    known_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
         server_socket.bind((my_host, my_port))
 
         print(f"Server listening on host {my_host} and PORT {my_port}")
-        gossip(my_host, my_port)
+
+        #init gossip
+        ping_gossip(my_host, my_port, known_socket, 100)
+        start_time = time.time()
 
         while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+            print(f"ELAPSE:{elapsed_time}")
+            ping = ping_gossip(my_host, my_port, known_socket, elapsed_time)
+            if ping:
+                print("PING GOSSIP 30 SEC")
+                start_time = time.time()
 
             data, addr = server_socket.recvfrom(1024)
-
+            json_data = json.loads(data)
             print("\nReceived From ", addr)
-            print(data.decode())
+
+            handle_response(json_data)
 
 def main():
     my_server(MY_HOST, MY_PORT)
