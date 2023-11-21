@@ -11,7 +11,7 @@ import time
 
 # echo '{"type": "GOSSIP", "host": "130.179.28.110", "port": 8999, "id": 1, "name": "Hello World!",}' | nc -u 130.179.28.37 8999
 
-MY_HOST, MY_PORT = "130.179.28.127", 8759
+MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 EAGLE_HOST, EAGLE_PORT = "eagle.cs.umanitoba.ca", 8999
 ROBIN_HOST, ROBIN_PORT = "robin.cs.umanitoba.ca", 8999
@@ -52,10 +52,10 @@ def is_peer_list(gossip_message):
     #false if doesn't exist
     return False 
 
-def send_gossip_reply(known_socket, gossip_message):
+def send_gossip_reply(my_host, known_socket, gossip_message):
     gossip_reply = {
         "type": "GOSSIP_REPLY",
-        "host": MY_HOST,
+        "host": my_host,
         "port": MY_PORT,
         "name": "jepz"
     }
@@ -88,13 +88,15 @@ def gossip(my_host, my_port, known_socket, known_host, known_port):
     # 2. Reply gossip message received
     print()
 
-def handle_response(known_socket, json_response):
+def handle_response(my_host, known_socket, json_response):
     print(json_response)
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
         add_peer_list(json_response)
-        send_gossip_reply(known_socket, json_response)
+        send_gossip_reply(my_host, known_socket, json_response)
         # print(print_peers())
+    elif msg_type == "GOSSIP_REPLY":
+        print("handle reply here")
     
 
     
@@ -111,6 +113,7 @@ def my_server(my_host, my_port):
     known_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
+        
         server_socket.bind((my_host, my_port))
 
         print(f"Server listening on host {my_host} and PORT {my_port}")
@@ -120,22 +123,30 @@ def my_server(my_host, my_port):
         start_time = time.time()
 
         while True:
-            current_time = time.time()
-            elapsed_time = current_time - start_time
-            print(f"ELAPSE:{elapsed_time}")
-            ping = ping_gossip(my_host, my_port, known_socket, elapsed_time)
-            if ping:
-                print("PING GOSSIP 30 SEC")
-                start_time = time.time()
+            try:
+                current_time = time.time()
+                elapsed_time = current_time - start_time
+                print(f"ELAPSE:{elapsed_time}")
+                ping = ping_gossip(my_host, my_port, known_socket, elapsed_time)
+                if ping:
+                    print("PING GOSSIP 30 SEC")
+                    start_time = time.time()
 
-            data, addr = server_socket.recvfrom(1024)
-            json_data = json.loads(data)
-            print("\nReceived From ", addr)
+                data, addr = server_socket.recvfrom(1024)
+                json_data = json.loads(data)
+                print("\nReceived From ", addr)
 
-            handle_response(known_socket, json_data)
+                handle_response(my_host, known_socket, json_data)
+            
+            except TypeError as e:
+                print(f"Type Error: {e}")
+
 
 def main():
-    my_server(MY_HOST, MY_PORT)
+    hostname = socket.gethostname()
+    # Get the IP address associated with the local hostname
+    local_ip = socket.gethostbyname(hostname)
+    my_server(local_ip, MY_PORT)
 
 if __name__ == "__main__":
     main()
