@@ -4,7 +4,7 @@ import uuid
 import time
 # TODO:
 # 1. GOSSIP
-    # - Drop peer in peer list 1 minute no response
+    # - gossip to 3 random peers
 # 2. Consensus
 # 3. Create Chain
 # 4. Add Block
