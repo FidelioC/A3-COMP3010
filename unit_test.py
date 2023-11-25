@@ -25,7 +25,7 @@ def test_removepeer():
     curr_time = curr_time + 61
     print(f"currtime+61: {curr_time}")
 
-    peer.remove_peer(1,peer_obj_list,curr_time)
+    peer.remove_peer(peer_obj_list,curr_time)
 
 def main():
     # test_getpeer()

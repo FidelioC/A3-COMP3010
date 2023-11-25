@@ -2,9 +2,12 @@ import socket
 import json
 import uuid
 import time
+import random
 # TODO:
 # 1. GOSSIP
-    # - gossip to 3 random peers
+    # - gossip to 3 random peers, 
+    # gossip received message, dont want to gossip the same thing to same person
+    # generate id every gossip
 # 2. Consensus
 # 3. Create Chain
 # 4. Add Block
@@ -13,9 +16,6 @@ import time
 
 MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
-EAGLE_HOST, EAGLE_PORT = "eagle.cs.umanitoba.ca", 8999
-ROBIN_HOST, ROBIN_PORT = "robin.cs.umanitoba.ca", 8999
-MY_PEER_ID = str(uuid.uuid4())
 TIMEOUT = 60
 
 class Peer:
@@ -79,9 +79,18 @@ def is_peer_list(gossip_message):
     for peer in peer_obj_list:
         if peer.peer_id == gossip_id:
             return True #true if duplicate
-        
+    
     #false if doesn't exist
     return False 
+
+def is_peer_myself(gossip_message, my_host, my_port):
+    gossip_host = gossip_message["host"]
+    gossip_port = gossip_message["port"]
+
+    if gossip_host == my_host and gossip_port == my_port:
+        return True
+    else:
+        return False
 
 def send_gossip_reply(my_host, known_socket, gossip_message):
     gossip_reply = {
@@ -95,9 +104,9 @@ def send_gossip_reply(my_host, known_socket, gossip_message):
     port_original = gossip_message["port"]
     known_socket.sendto(json.dumps(gossip_reply).encode(), (host_original,port_original))
 
-def add_peer_list(gossip_message):
-    # add peer to list
-    if not is_peer_list(gossip_message):
+def add_peer_list(my_host, my_port, gossip_message):
+    # add peer to list if not in list and not myself
+    if not is_peer_list(gossip_message) and not is_peer_myself(gossip_message, my_host, my_port):
         peer_object = Peer(gossip_message["host"], gossip_message["port"], gossip_message["name"], gossip_message["id"])
         peer_obj_list.append(peer_object)
 
@@ -106,7 +115,7 @@ def announce_network(my_host, my_port, known_socket, known_host, known_port):
         "type": "GOSSIP",
         "host": my_host,
         "port": my_port,
-        "id": MY_PEER_ID,
+        "id": str(uuid.uuid4()),
         "name": "jepz",
     }
 
@@ -129,7 +138,7 @@ def handle_response(my_host, known_socket, json_response):
         renew_timeout_peer(peer_id, peer_obj_list)
         remove_peer(peer_obj_list, time.time())
         #add peer to list if not exist in peer list
-        add_peer_list(json_response)
+        add_peer_list(my_host, MY_PORT, json_response)
         #send back gossip reply
         send_gossip_reply(my_host, known_socket, json_response)
         print(print_peers())
@@ -139,11 +148,13 @@ def handle_response(my_host, known_socket, json_response):
 
 def ping_gossip(my_host, my_port, known_socket, elapsed_time):
     duration = 20
-    # gossip to 3 different well-known hosts 
+    # gossip to 3 different random hosts from list
     if elapsed_time >= duration:
-        gossip(my_host, my_port, known_socket, SILICON_HOST, SILICON_PORT)
-        gossip(my_host, my_port, known_socket, EAGLE_HOST, EAGLE_PORT)
-        gossip(my_host, my_port, known_socket, ROBIN_HOST, ROBIN_PORT)
+        random_hosts = random.sample(peer_obj_list, 3)
+        print(f"GOSSIPING TO: {random_hosts}")
+        gossip(my_host, my_port, known_socket, random_hosts[0].peer_host, random_hosts[0].peer_port)
+        gossip(my_host, my_port, known_socket, random_hosts[1].peer_host, random_hosts[1].peer_port)
+        gossip(my_host, my_port, known_socket, random_hosts[2].peer_host, random_hosts[2].peer_port)
         return True
 
 def my_server(my_host, my_port):
@@ -155,8 +166,8 @@ def my_server(my_host, my_port):
 
         print(f"Server listening on host {my_host} and PORT {my_port}")
 
-        #init gossip
-        ping_gossip(my_host, my_port, known_socket, 100)
+        #init gossip to well known host
+        gossip(my_host, my_port, known_socket, SILICON_HOST, SILICON_PORT)
         start_time = time.time()
 
         while True:
