@@ -4,8 +4,7 @@ import uuid
 import time
 import random
 # TODO:
-# 1. GOSSIP
-    # gossip received message, dont want to gossip the same thing to same person
+# 1. GOSSIP (done)
 # 2. Consensus
 # 3. Create Chain
 # 4. Add Block
@@ -48,14 +47,19 @@ class Peer:
 
         self.sock.sendto(json.dumps(gossip_message).encode(), (self.peer_host, self.peer_port))
 
-    def send_message_to_peer(self, message, known_socket):
+    def forward_gossip_peer(self, message):
         if message not in self.sent_messages:
+            print(f"FORWARDING MESSAGE {message} to {self.peer_name} {self.peer_id}")
+            self.sock.sendto(json.dumps(message).encode(), (self.peer_host, self.peer_port))
             self.sent_messages.append(message)
+        else:
+            print("SENT MESSAGE DETECTED, ABORTING FORWARD MESSAGE")
+
 
     def __str__(self):
         return str(self.to_json())
     
-peer_obj_list = []
+peer_obj_list:Peer = []
 
 def renew_timeout_peer(peer_id, peer_list):
     renew_peer:Peer = get_peer(peer_id, peer_list)
@@ -126,7 +130,13 @@ def add_peer_list(my_host, my_port, gossip_message):
     if not is_peer_list(gossip_message) and not is_peer_myself(gossip_message, my_host, my_port):
         peer_object = Peer(gossip_message["host"], gossip_message["port"], gossip_message["name"], gossip_message["id"])
         peer_obj_list.append(peer_object)
-    
+
+def foward_messages(gossip_message, my_host):
+    for peer in peer_obj_list:
+        #ignore own messages
+        if not is_peer_myself(gossip_message, my_host, MY_PORT):
+            peer.forward_gossip_peer(gossip_message)
+
 def handle_response(my_host, server_socket, json_response):
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
@@ -141,7 +151,7 @@ def handle_response(my_host, server_socket, json_response):
         #send back gossip reply
         send_gossip_reply(my_host, server_socket, json_response)
         #send gossip message to all peers exactly once
-
+        foward_messages(json_response, my_host)
         print(print_peers())
     
 def ping_gossip(my_host, my_port, elapsed_time):
