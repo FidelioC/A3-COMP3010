@@ -5,9 +5,7 @@ import time
 import random
 # TODO:
 # 1. GOSSIP
-    # - gossip to 3 random peers, 
     # gossip received message, dont want to gossip the same thing to same person
-    # generate id every gossip
 # 2. Consensus
 # 3. Create Chain
 # 4. Add Block
@@ -17,6 +15,7 @@ import random
 MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
+GOSSIP_REPEAT_DURATION = 20
 
 class Peer:
     def __init__(self, peer_host = None, peer_port = None, peer_name = None, peer_id = None):
@@ -25,7 +24,10 @@ class Peer:
         self.peer_name = peer_name
         self.peer_id = peer_id
         self.timeout = time.time() + TIMEOUT
-
+        self.sent_messages = []
+        self.sock = socket.socket(
+                socket.AF_INET, socket.SOCK_DGRAM)
+        
     def to_json(self):
         return {
             "peer_host": self.peer_host,
@@ -35,6 +37,21 @@ class Peer:
             "timeout": self.timeout,
         }
     
+    def gossip(self, my_host, my_port):
+        gossip_message = {
+            "type": "GOSSIP",
+            "host": my_host,
+            "port": my_port,
+            "id": str(uuid.uuid4()),
+            "name": "jepz",
+        }
+
+        self.sock.sendto(json.dumps(gossip_message).encode(), (self.peer_host, self.peer_port))
+
+    def send_message_to_peer(self, message, known_socket):
+        if message not in self.sent_messages:
+            self.sent_messages.append(message)
+
     def __str__(self):
         return str(self.to_json())
     
@@ -92,7 +109,7 @@ def is_peer_myself(gossip_message, my_host, my_port):
     else:
         return False
 
-def send_gossip_reply(my_host, known_socket, gossip_message):
+def send_gossip_reply(my_host, server_socket, gossip_message):
     gossip_reply = {
         "type": "GOSSIP_REPLY",
         "host": my_host,
@@ -102,33 +119,15 @@ def send_gossip_reply(my_host, known_socket, gossip_message):
 
     host_original = gossip_message["host"]
     port_original = gossip_message["port"]
-    known_socket.sendto(json.dumps(gossip_reply).encode(), (host_original,port_original))
+    server_socket.sendto(json.dumps(gossip_reply).encode(), (host_original,port_original))
 
 def add_peer_list(my_host, my_port, gossip_message):
     # add peer to list if not in list and not myself
     if not is_peer_list(gossip_message) and not is_peer_myself(gossip_message, my_host, my_port):
         peer_object = Peer(gossip_message["host"], gossip_message["port"], gossip_message["name"], gossip_message["id"])
         peer_obj_list.append(peer_object)
-
-def announce_network(my_host, my_port, known_socket, known_host, known_port):
-    gossip_message = {
-        "type": "GOSSIP",
-        "host": my_host,
-        "port": my_port,
-        "id": str(uuid.uuid4()),
-        "name": "jepz",
-    }
-
-    known_socket.sendto(json.dumps(gossip_message).encode(), (known_host, known_port))
-
-def gossip(my_host, my_port, known_socket, known_host, known_port):
-    # TODO:
-    # 1. connect to one well-known host
-    announce_network(my_host, my_port, known_socket, known_host, known_port)
-    # 2. Reply gossip message received
-    print()
-
-def handle_response(my_host, known_socket, json_response):
+    
+def handle_response(my_host, server_socket, json_response):
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
         print(json_response)
@@ -140,26 +139,21 @@ def handle_response(my_host, known_socket, json_response):
         #add peer to list if not exist in peer list
         add_peer_list(my_host, MY_PORT, json_response)
         #send back gossip reply
-        send_gossip_reply(my_host, known_socket, json_response)
-        print(print_peers())
-    elif msg_type == "GOSSIP_REPLY":
-        print("handle reply here")
-    
+        send_gossip_reply(my_host, server_socket, json_response)
+        #send gossip message to all peers exactly once
 
-def ping_gossip(my_host, my_port, known_socket, elapsed_time):
-    duration = 20
+        print(print_peers())
+    
+def ping_gossip(my_host, my_port, elapsed_time):
     # gossip to 3 different random hosts from list
-    if elapsed_time >= duration:
+    if elapsed_time >= GOSSIP_REPEAT_DURATION:
         random_hosts = random.sample(peer_obj_list, 3)
         print(f"GOSSIPING TO: {random_hosts}")
-        gossip(my_host, my_port, known_socket, random_hosts[0].peer_host, random_hosts[0].peer_port)
-        gossip(my_host, my_port, known_socket, random_hosts[1].peer_host, random_hosts[1].peer_port)
-        gossip(my_host, my_port, known_socket, random_hosts[2].peer_host, random_hosts[2].peer_port)
+        for host in random_hosts:
+            host.gossip(my_host, my_port)
         return True
 
 def my_server(my_host, my_port):
-    known_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
         
         server_socket.bind((my_host, my_port))
@@ -167,7 +161,8 @@ def my_server(my_host, my_port):
         print(f"Server listening on host {my_host} and PORT {my_port}")
 
         #init gossip to well known host
-        gossip(my_host, my_port, known_socket, SILICON_HOST, SILICON_PORT)
+        init_peer = Peer(SILICON_HOST, SILICON_PORT, None, None)
+        init_peer.gossip(my_host, my_port)
         start_time = time.time()
 
         while True:
@@ -175,7 +170,7 @@ def my_server(my_host, my_port):
                 current_time = time.time()
                 elapsed_time = current_time - start_time
                 print(f"ELAPSE:{elapsed_time}")
-                ping = ping_gossip(my_host, my_port, known_socket, elapsed_time)
+                ping = ping_gossip(my_host, my_port, elapsed_time)
                 if ping:
                     print("PING GOSSIP 30 SEC")
                     start_time = time.time()
@@ -184,7 +179,7 @@ def my_server(my_host, my_port):
                 json_data = json.loads(data)
                 print("\nReceived From ", addr)
 
-                handle_response(my_host, known_socket, json_data)
+                handle_response(my_host, server_socket, json_data)
             
             except TypeError as e:
                 print(f"Type Error: {e}")
