@@ -6,6 +6,8 @@ import random
 # TODO:
 # 1. GOSSIP (done)
 # 2. Consensus
+    # Consensus time out
+    # choose longest chain
 # 3. Create Chain
 # 4. Add Block
 
@@ -15,6 +17,7 @@ MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
+CONSENSUS_DURATION = 10
 
 class Peer:
     def __init__(self, peer_host = None, peer_port = None, peer_name = None, peer_id = None, sock = socket):
@@ -41,19 +44,19 @@ class Peer:
             "host": my_host,
             "port": my_port,
             "id": str(uuid.uuid4()),
-            "name": "jepz",
+            "name": "duolingo",
         }
 
         self.sock.sendto(json.dumps(gossip_message).encode(), (self.peer_host, self.peer_port))
 
     def forward_gossip_peer(self, message):
         if message not in self.sent_messages:
-            print(f"FORWARDING MESSAGE {message} to {self.peer_name} {self.peer_id}")
+            # print(f"FORWARDING MESSAGE {message} to {self.peer_name} {self.peer_id}")
             self.sock.sendto(json.dumps(message).encode(), (self.peer_host, self.peer_port))
             self.sent_messages.append(message)
 
     def send_stat(self):
-        print(f"SENDING STAT MSG TO {self.peer_name, self.peer_host, self.sock}")
+        print(f"SENDING STAT MSG TO {self.peer_name, self.peer_host, self.peer_port}")
         stat_msg = {"type":"STATS"}
         self.sock.sendto(json.dumps(stat_msg).encode(), (self.peer_host, self.peer_port))
 
@@ -119,7 +122,7 @@ def send_gossip_reply(my_host, server_socket, gossip_message):
         "type": "GOSSIP_REPLY",
         "host": my_host,
         "port": MY_PORT,
-        "name": "jepz"
+        "name": "duolingo"
     }
 
     host_original = gossip_message["host"]
@@ -138,37 +141,22 @@ def foward_messages(gossip_message, my_host):
         if not is_peer_myself(gossip_message, my_host, MY_PORT):
             peer.forward_gossip_peer(gossip_message)
 
-def do_gossip(my_host, server_socket, start_time):
+def do_gossip(my_host, server_socket, json_response):
     print("INSIDE GOSSIP")
-    # ping gossip every 30 secs
-    current_time = time.time()
-    elapsed_time = current_time - start_time
-    print(f"ELAPSE:{elapsed_time}")
-    ping = ping_gossip(my_host, MY_PORT, elapsed_time)
+    #handle peers -> renew peer timeout or remove peer
+    print(f"CURRENT TIME: {time.time()}")
+    peer_id = json_response["id"]
+    renew_timeout_peer(peer_id, peer_obj_list)
+    remove_peer(peer_obj_list, time.time())
 
-    #get the data
-    data, addr = server_socket.recvfrom(1024)
-    json_response = json.loads(data)
-    print(f"\nReceived From {addr}, \ndata: {json_response}")
-    msg_type = json_response["type"]
+    #add peer to list if not exist in peer list
+    add_peer_list(my_host, MY_PORT, json_response, server_socket)
 
-    if msg_type == "GOSSIP":
-        #handle peers -> renew peer timeout or remove peer
-        print(f"CURRENT TIME: {time.time()}")
-        peer_id = json_response["id"]
-        renew_timeout_peer(peer_id, peer_obj_list)
-        remove_peer(peer_obj_list, time.time())
+    #send back gossip reply
+    send_gossip_reply(my_host, server_socket, json_response)
 
-        #add peer to list if not exist in peer list
-        add_peer_list(my_host, MY_PORT, json_response, server_socket)
-
-        #send back gossip reply
-        send_gossip_reply(my_host, server_socket, json_response)
-
-        #send gossip message to all peers exactly once
-        foward_messages(json_response, my_host)
-    
-    return ping
+    #send gossip message to all peers exactly once
+    foward_messages(json_response, my_host)
     # print(print_peers())
 
 def ping_gossip(my_host, my_port, elapsed_time):
@@ -180,18 +168,44 @@ def ping_gossip(my_host, my_port, elapsed_time):
             host.gossip(my_host, my_port)
         return True
 
-def do_consensus(server_socket):
-    print("INSIDE CONSENSUS")
-    #get the data
-    data, addr = server_socket.recvfrom(1024)
-    json_response = json.loads(data)
-    print(f"\nReceived From {addr}, \ndata: {json_response}")
+def send_stats():
+    print("INSIDE STATS")
+    # send STATs to all peers at once
+    for peer in peer_obj_list:
+        peer.send_stat()
+    print("FINISHED SENDING STATS")
+
+def do_consensus(json_response, stats_replies):
+    stats_replies.append(json_response)
+    print(f"STATS REPLIES: {stats_replies}")
+
+def handle_response(my_host, server_socket, json_response):
     msg_type = json_response["type"]
-    if msg_type == "CONSENSUS":
-        # send to all peers at once
-        for peer in peer_obj_list:
-            peer.send_stat()
-        print("FINISHED CONSENSUS")
+    if msg_type == "GOSSIP":
+        do_gossip(my_host, server_socket, json_response)
+
+def handle_consensus(my_host, server_socket, json_response):
+    finish_consensus_time = time.time() + CONSENSUS_DURATION
+    send_stats()
+    #timeout, doing consensus currently
+    while time.time() <= finish_consensus_time:
+        stats_replies = []
+        #get the data
+        print("RECEINVING REPLIES STATS")
+        data, addr = server_socket.recvfrom(1024)
+        json_response = json.loads(data)
+        print(f"\nReceived From {addr}, \ndata: {json_response}")
+        msg_type = json_response["type"]
+
+        # save stats_reply
+        if msg_type == "STATS_REPLY":
+            do_consensus(json_response, stats_replies)
+            print(stats_replies)
+        #handle other requests, but dont handle other consensus
+        elif msg_type != "STATS_REPLY" and msg_type != "CONSENSUS": 
+            handle_response(my_host, server_socket, json_response)
+        else:
+            print("CANT HANDLE OTHER CONSENSUS")
 
 def my_server(my_host, my_port):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
@@ -205,13 +219,37 @@ def my_server(my_host, my_port):
         init_peer.gossip(my_host, my_port)
         start_time = time.time()
 
+        #init consensus, false because can't do consensus initially
+        is_consensus = False
         while True:
             try:
-                ping = do_gossip(my_host, server_socket, start_time)
+                #ping gossip every 30 secs
+                current_time = time.time()
+                elapsed_time = current_time - start_time
+                print(f"ELAPSE:{elapsed_time}")
+                ping = ping_gossip(my_host, my_port, elapsed_time)
                 if ping:
                     print("PING GOSSIP 30 SEC")
                     start_time = time.time()
-                do_consensus(server_socket)
+
+                #get the data
+                data, addr = server_socket.recvfrom(1024)
+                json_response = json.loads(data)
+                print(f"\nReceived From {addr}, \ndata: {json_response}")
+                msg_type = json_response["type"]
+
+                #handle consensus
+                if msg_type == "CONSENSUS" and not is_consensus:
+                    #starting consensus
+                    is_consensus = True
+                    handle_consensus(my_host, server_socket, json_response)
+                    print("ENDING REPLIES STATS")
+                    # finished consensus
+                    is_consensus = False
+                else: #handle any other response
+                    handle_response(my_host, server_socket, json_response)
+                    
+                
             except TypeError as e:
                 print(f"Type Error: {e}")
 
