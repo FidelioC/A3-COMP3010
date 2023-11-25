@@ -3,11 +3,11 @@ import json
 import uuid
 import time
 import random
+from collections import Counter
+
 # TODO:
 # 1. GOSSIP (done)
-# 2. Consensus
-    # Consensus time out
-    # choose longest chain
+# 2. Consensus (done)
 # 3. Create Chain
 # 4. Add Block
 
@@ -163,7 +163,7 @@ def ping_gossip(my_host, my_port, elapsed_time):
     # gossip to 3 different random hosts from list
     if elapsed_time >= GOSSIP_REPEAT_DURATION:
         random_hosts = random.sample(peer_obj_list, 3)
-        print(f"GOSSIPING TO: {random_hosts}")
+        # print(f"GOSSIPING TO: {random_hosts}")
         for host in random_hosts:
             host.gossip(my_host, my_port)
         return True
@@ -175,10 +175,43 @@ def send_stats():
         peer.send_stat()
     print("FINISHED SENDING STATS")
 
-def do_consensus(json_response, stats_replies):
+def save_stats_reply(addr, json_response, stats_replies):
+    json_response["host"] = addr[0]
+    json_response["port"] = addr[1]
     stats_replies.append(json_response)
-    print(f"STATS REPLIES: {stats_replies}")
 
+def do_consensus(stats_replies):
+    '''
+    do consensus. Return lists with the max height
+    '''
+    print("DOING CONSENSUS")
+    
+    consensus_list = get_consensus_list(stats_replies)
+
+    for list in consensus_list:
+        print(f"{list} \n")
+
+def get_consensus_list(stats_replies):
+    return find_majority_hash(find_max_height(stats_replies))
+
+def find_max_height(stats_replies):
+    # Find the maximum height
+    max_height = max(entry['height'] for entry in stats_replies)
+    return [entry for entry in stats_replies if entry['height'] == max_height]
+
+def find_majority_hash(stats_replies):
+    hash_counts = {}
+    for entry in stats_replies:
+        current_hash = entry['hash']
+        hash_counts[current_hash] = hash_counts.get(current_hash, 0) + 1
+
+    # Find the majority hash
+    majority_hash = max(hash_counts, key=hash_counts.get)
+
+    # Filter entries with the majority hash
+    entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
+    return entries_with_majority_hash
+    
 def handle_response(my_host, server_socket, json_response):
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
@@ -186,12 +219,13 @@ def handle_response(my_host, server_socket, json_response):
 
 def handle_consensus(my_host, server_socket, json_response):
     finish_consensus_time = time.time() + CONSENSUS_DURATION
+    # send stats to all peers at once
     send_stats()
+    stats_replies = []
     #timeout, doing consensus currently
     while time.time() <= finish_consensus_time:
-        stats_replies = []
         #get the data
-        print("RECEINVING REPLIES STATS")
+        print("RECEIVING REPLIES STATS")
         data, addr = server_socket.recvfrom(1024)
         json_response = json.loads(data)
         print(f"\nReceived From {addr}, \ndata: {json_response}")
@@ -199,13 +233,18 @@ def handle_consensus(my_host, server_socket, json_response):
 
         # save stats_reply
         if msg_type == "STATS_REPLY":
-            do_consensus(json_response, stats_replies)
-            print(stats_replies)
+            save_stats_reply(addr, json_response, stats_replies)
+            print("STATS REPLY: ")
+            for stat in stats_replies:
+                print(f"{stat} \n")
         #handle other requests, but dont handle other consensus
         elif msg_type != "STATS_REPLY" and msg_type != "CONSENSUS": 
             handle_response(my_host, server_socket, json_response)
         else:
             print("CANT HANDLE OTHER CONSENSUS")
+    
+    #after getting all stats reply, do consensus
+    do_consensus(stats_replies)
 
 def my_server(my_host, my_port):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
