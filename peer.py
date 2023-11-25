@@ -9,6 +9,10 @@ from collections import Counter
 # 1. GOSSIP (done)
 # 2. Consensus (done)
 # 3. Create Chain
+    # from the consesus_list, 
+    # iterate one by one, load balance each block until current height
+    # save that block to the blocklist
+
 # 4. Add Block
 
 # echo '{"type": "GOSSIP", "host": "130.179.28.110", "port": 8999, "id": 1, "name": "Hello World!",}' | nc -u 130.179.28.37 8999
@@ -18,6 +22,8 @@ SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_DURATION = 10
+
+my_chain = []
 
 class Peer:
     def __init__(self, peer_host = None, peer_port = None, peer_name = None, peer_id = None, sock = socket):
@@ -129,9 +135,21 @@ def send_gossip_reply(my_host, server_socket, gossip_message):
     port_original = gossip_message["port"]
     server_socket.sendto(json.dumps(gossip_reply).encode(), (host_original,port_original))
 
+def get_peer_by_addr(peer_host, peer_port):
+    for peer in peer_obj_list:
+        if peer.peer_host == peer_host and peer.peer_port == peer_port:
+            return peer
+    
+    return None
+
 def add_peer_list(my_host, my_port, gossip_message, sock):
     # add peer to list if not in list and not myself
     if not is_peer_list(gossip_message) and not is_peer_myself(gossip_message, my_host, my_port):
+        exist_peer = get_peer_by_addr(gossip_message["host"], gossip_message["port"])
+        # don't want to have two same peers with different id
+        if exist_peer:
+            peer_obj_list.remove(exist_peer)
+        
         peer_object = Peer(gossip_message["host"], gossip_message["port"], gossip_message["name"], gossip_message["id"], sock)
         peer_obj_list.append(peer_object)
 
@@ -157,7 +175,7 @@ def do_gossip(my_host, server_socket, json_response):
 
     #send gossip message to all peers exactly once
     foward_messages(json_response, my_host)
-    # print(print_peers())
+    print(print_peers())
 
 def ping_gossip(my_host, my_port, elapsed_time):
     # gossip to 3 different random hosts from list
@@ -182,7 +200,8 @@ def save_stats_reply(addr, json_response, stats_replies):
 
 def do_consensus(stats_replies):
     '''
-    do consensus. Return lists with the max height
+    do consensus. 
+    get lists of peers by majority of longest chain
     '''
     print("DOING CONSENSUS")
     
@@ -190,6 +209,11 @@ def do_consensus(stats_replies):
 
     for list in consensus_list:
         print(f"{list} \n")
+
+def do_getblock():
+    '''
+    get block from peers
+    '''
 
 def get_consensus_list(stats_replies):
     return find_majority_hash(find_max_height(stats_replies))
