@@ -3,15 +3,16 @@ import json
 import uuid
 import time
 import random
-from collections import Counter
+import hashlib
 
 # TODO:
 # 1. GOSSIP (done)
 # 2. Consensus (done)
 # 3. Create Chain
     # from the consesus_list, 
-    # iterate one by one, load balance each block until current height
-    # save that block to the blocklist
+    # iterate one by one, load balance each block until current height 
+    # save that block to the blocklist 
+    # now, after receving all those blocks, validate it using cryptography
 
 # 4. Add Block
 
@@ -23,6 +24,7 @@ TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_DURATION = 10
 GETBLOCK_DURATION = 10
+DIFFICULTY = 9
 
 consensus_peers = []
 my_chain = []
@@ -281,12 +283,81 @@ def request_missing_blocks(missing_blocks, consensus_list):
         # load balance get block request
         while(curr_index < total_missing):
             for peer in consensus_list:
-                peer_obj = get_peer_by_addr(peer["host"], peer["port"])
-                peer_obj.send_getblock(missing_blocks[curr_index])
-                curr_index += 1 
+                if curr_index < total_missing:
+                    peer_obj = get_peer_by_addr(peer["host"], peer["port"])
+                    peer_obj.send_getblock(missing_blocks[curr_index])
+                    curr_index += 1 
     
 def get_consensus_list(stats_replies):
     return find_majority_hash(find_max_height(stats_replies))
+
+def validate_chain(current_chain):
+    '''
+    chain validation here.
+    1. Messages have a maximum length of 20 characters (keeps us under MTU)
+    2. Blocks have a maximum of 10 messages in them.
+    3. A nonce is a string (really, bytes) and must be less than 40 characters
+    4. Every block has the correct hash
+    5. And the hash has the correct difficulty
+    '''
+    for i in range(len(current_chain)):
+        current_block = current_chain[i]
+        if i == 0:
+            validate_block(current_block, None) #genesis block
+        else:
+            prev_block = current_chain[i-1]
+            validate_block(current_block, prev_block)
+
+def validate_block_messages(block_messages):
+    if len(block_messages) > 10:
+        return False
+    
+    for message in block_messages:
+        if len(message) > 20:
+            return False
+    
+    return True
+
+def validate_block_nonce(block_nonce):
+    if len(block_nonce) > 40:
+        return False
+    
+    return True
+
+def validate_block(current_block, prev_block):
+    block_hash = current_block["hash"]
+    block_messages = current_block["messages"]
+    block_minedby = current_block["minedBy"]
+    block_nonce = current_block["nonce"]
+    block_time = current_block["timestamp"]
+    
+    # get block hash
+    hashBase = hashlib.sha256()
+
+    # prev hash
+    if prev_block != None: #ignore if genesis
+        hashBase.update(prev_block['hash'].encode()) 
+    # mined by 
+    hashBase.update(block_minedby.encode()) 
+    # messages
+    for message in block_messages: 
+        hashBase.update(message.encode())
+    # time
+    hashBase.update(block_time.to_bytes(8,'big'))
+    # nonce
+    hashBase.update(block_nonce.encode())
+   
+    print(f"generated hash {hashBase.hexdigest()}")
+    print(f"current hash {current_block['hash']}")
+    #validate all requirements
+    if (hashBase.hexdigest() == current_block["hash"] 
+        and validate_block_nonce(block_nonce) 
+        and validate_block_messages(block_messages)
+        and block_hash[-1 * DIFFICULTY:] == '0' * DIFFICULTY):
+        return True
+    else:
+        return False
+
 
 def find_max_height(stats_replies):
     # Find the maximum height

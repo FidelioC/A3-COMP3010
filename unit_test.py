@@ -81,6 +81,38 @@ def test_findmissingblock():
     missing_blocks = peer.find_missing_blocks(chain)
     for block in missing_blocks:
         print(f"{block}")
+
+def test_validate_block():
+    block = {'hash': 'da32c5e6d1478caad5c39eea5f05855daed3bda5980da4633aa1e5c000000000', 
+             'height': 0, 
+             'messages': ['3010 rocks', 
+                          'Warning:', 
+                          'Procrastinators', 
+                          'will be sent back', 
+                          'in time to start', 
+                          'early.', 
+                          'Chain 2'], 
+             'minedBy': 'Prof!', 
+             'nonce': '742463477029129', 
+             'timestamp': 1700629652}
+    
+    next_block = {'hash': '5b0cc813303f305927dbaf559bebab19229ba30106687a61ed4c62d000000000', 
+                  'height': 1, 
+                  'messages': ["wiz's", 
+                               'shrouded', 
+                               'regenerates', 
+                               "reconnaissance's", 
+                               'penitence'], 
+                   'minedBy': 'Prof!', 
+                   'nonce': '2251755442', 
+                   'timestamp': 1700636371}
+    block80 = {'hash': '2fc329f7cbf06417158665c819d29f6ea1f41e6789c269ca6b6de8c000000000', 'height': 80, 'messages': ['Elstan', 'funmaking'], 'minedBy': 'GossipZilla!', 'nonce': '1458333614994197', 'timestamp': 1700823420}
+    block79 = {'hash': '0eb8fd66cb4f1937f5ccfb1a661955bb42c7168ef300baef191e057000000000', 'height': 79, 'messages': ['PSI'], 'minedBy': 'GossipZilla!', 'nonce': '2500000301125418', 'timestamp': 1700822662}
+    print(f"MESSAGE {peer.validate_block_messages(block80['messages'])}")
+    print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
+    print(f"VALIDATE BLOCK {peer.validate_block(next_block, block)}")
+
+
 def main():
     # test_getpeer()
     # test_renewtimeout()
@@ -88,7 +120,8 @@ def main():
     # test_findmaxheight()
     # test_find_majority_hash()
     # test_getconsensuslist()
-    test_findmissingblock()
+    # test_findmissingblock()
+    test_validate_block()
 
 if __name__ == "__main__":
     main()

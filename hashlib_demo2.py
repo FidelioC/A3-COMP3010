@@ -30,3 +30,14 @@ m.update('353209354'.encode())
 
 print('c52368025ea9253b9d4371ebec8e271f214779c18bc123a21dd8ef5f00000000')
 print(m.hexdigest())
+
+
+m = hashlib.sha256()
+m.update('0dd77c76667684060e8f1b329f3489319e145d4f2b368611d075a0f000000000'.encode())
+m.update('GossipZilla!'.encode())
+m.update('Rechabitism'.encode())
+m.update("crases".encode())
+m.update(int(1700725352).to_bytes(8,'big'))
+m.update('6458333929368288'.encode())
+
+print(m.hexdigest())
