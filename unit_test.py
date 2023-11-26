@@ -112,6 +112,16 @@ def test_validate_block():
     print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
     print(f"VALIDATE BLOCK {peer.validate_block(next_block, block)}")
 
+def test_validate_chain():
+    curr_chain = [
+        {'hash': 'da32c5e6d1478caad5c39eea5f05855daed3bda5980da4633aa1e5c000000000', 'height': 0, 'messages': ['3010 rocks', 'Warning:', 'Procrastinators', 'will be sent back', 'in time to start', 'early.', 'Chain 2'], 'minedBy': 'Prof!', 'nonce': '742463477029129', 'timestamp': 1700629652},
+        {'hash': '5b0cc813303f305927dbaf559bebab19229ba30106687a61ed4c62d000000000', 'height': 1, 'messages': ["wiz's", 'shrouded', 'regenerates', "reconnaissance's", 'penitence'], 'minedBy': 'Prof!', 'nonce': '2251755442', 'timestamp': 1700636371},
+        {'hash': '6e242a9cb5822240f8de04a6b7a7ce9813a9587eb9cf621dcca93bb000000000', 'height': 2, 'messages': ['overanimated'], 'minedBy': 'GossipZilla!', 'nonce': '2083334054052021', 'timestamp': 1700655104},
+        {'hash': 'bb02ecf8b3ff4bb3e18ff08217c6d3429895da1f34833888fee339e000000000', 'height': 3, 'messages': ['fly-stuck'], 'minedBy': 'GossipZilla!', 'nonce': '4583335277304293', 'timestamp': 1700656987},
+        {'hash': 'c156db5000397adbfbf068c16e469ff9dcf083c896a1688b17708b5000000000', 'height': 4, 'messages': ['Bontocs', 'waivers'], 'minedBy': 'GossipZilla!', 'nonce': '208333437970814', 'timestamp': 1700662569},
+        {'hash': '4e2b16394768d1c819fe66976a6d650bd26c3eaa2f0ea362c220c23000000000', 'height': 5, 'messages': ["lubricant's", 'recap', 'peeved', 'intestines', 'blabbed', "nosiness's", 'creaming', 'fascists', 'castles', 'revolt'], 'minedBy': 'Prof!', 'nonce': '18822851911', 'timestamp': 1700670806},   
+    ]
+    print(f"VALIDATE CHAIN {peer.validate_chain(curr_chain)}")
 
 def main():
     # test_getpeer()
@@ -121,7 +131,9 @@ def main():
     # test_find_majority_hash()
     # test_getconsensuslist()
     # test_findmissingblock()
-    test_validate_block()
+    # test_validate_block()
+    test_validate_chain()
+
 
 if __name__ == "__main__":
     main()

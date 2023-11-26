@@ -28,6 +28,7 @@ DIFFICULTY = 9
 
 consensus_peers = []
 my_chain = []
+chain_valid = False
 
 class Peer:
     def __init__(self, peer_host = None, peer_port = None, peer_name = None, peer_id = None, sock = socket):
@@ -232,7 +233,8 @@ def do_getallblocks(consensus_list):
     while(curr_height <= max_height):
         for peer in consensus_list:
             peer_obj = get_peer_by_addr(peer["host"], peer["port"])
-            peer_obj.send_getblock(curr_height)
+            if peer_obj != None:
+                peer_obj.send_getblock(curr_height)
             curr_height += 1
 
 def block_format(json_response):
@@ -285,7 +287,8 @@ def request_missing_blocks(missing_blocks, consensus_list):
             for peer in consensus_list:
                 if curr_index < total_missing:
                     peer_obj = get_peer_by_addr(peer["host"], peer["port"])
-                    peer_obj.send_getblock(missing_blocks[curr_index])
+                    if peer_obj != None:
+                        peer_obj.send_getblock(missing_blocks[curr_index])
                     curr_index += 1 
     
 def get_consensus_list(stats_replies):
@@ -300,13 +303,15 @@ def validate_chain(current_chain):
     4. Every block has the correct hash
     5. And the hash has the correct difficulty
     '''
+    is_validated = True
     for i in range(len(current_chain)):
         current_block = current_chain[i]
         if i == 0:
-            validate_block(current_block, None) #genesis block
+            is_validated &= validate_block(current_block, None) #genesis block
         else:
             prev_block = current_chain[i-1]
-            validate_block(current_block, prev_block)
+            is_validated &= validate_block(current_block, prev_block)
+    return is_validated
 
 def validate_block_messages(block_messages):
     if len(block_messages) > 10:
@@ -347,8 +352,8 @@ def validate_block(current_block, prev_block):
     # nonce
     hashBase.update(block_nonce.encode())
    
-    print(f"generated hash {hashBase.hexdigest()}")
-    print(f"current hash {current_block['hash']}")
+    # print(f"generated hash {hashBase.hexdigest()}")
+    # print(f"current hash {current_block['hash']}")
     #validate all requirements
     if (hashBase.hexdigest() == current_block["hash"] 
         and validate_block_nonce(block_nonce) 
@@ -415,12 +420,12 @@ def handle_getblock_reply(my_host, server_socket, json_response):
         print(f"MISSING BLOCKS FOUND {missing_blocks}")
         request_missing_blocks(missing_blocks, consensus_peers)
     else:
-        "no more missing blocks. validate chain with crypto"
+        chain_valid = validate_chain(my_chain)
+        print(f"CHAIN VALIDATION {chain_valid}")
 
     print("MY CURRENT CHAIN: ")
     for block in my_chain:
         print(f"{block}\n")
-
     
 def handle_consensus(my_host, server_socket, json_response):
     finish_consensus_time = time.time() + CONSENSUS_DURATION
