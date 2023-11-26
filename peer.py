@@ -22,6 +22,7 @@ MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
+CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 10
 GETBLOCK_DURATION = 10
 DIFFICULTY = 9
@@ -366,8 +367,9 @@ def validate_block(current_block, prev_block):
 
 def find_max_height(stats_replies):
     # Find the maximum height
-    max_height = max(entry['height'] for entry in stats_replies)
-    return [entry for entry in stats_replies if entry['height'] == max_height]
+    if len(stats_replies) > 0:
+        max_height = max(entry['height'] for entry in stats_replies)
+        return [entry for entry in stats_replies if entry['height'] == max_height]
 
 def find_majority_hash(stats_replies):
     hash_counts = {}
@@ -382,11 +384,21 @@ def find_majority_hash(stats_replies):
     entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
     return entries_with_majority_hash
     
-def handle_response(my_host, server_socket, json_response):
+def handle_response(addr, my_host, server_socket, json_response):
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
         do_gossip(my_host, server_socket, json_response)
+    elif msg_type == "STATS" and chain_valid:
+        handle_stats_reply(addr, server_socket)
         
+def handle_stats_reply(addr, server_socket):
+    stats_reply_msg = {
+        "type": "STATS_REPLY",
+        "height": len(my_chain),
+        "hash": my_chain[len(my_chain)-1]["hash"] 
+    }
+    print(f"SENDING STATS REPLY: {stats_reply_msg} TO {addr}")
+    server_socket.sendto(json.dumps(stats_reply_msg).encode(), (addr[0], addr[1]))
 
 def handle_getblock_reply(my_host, server_socket, json_response):
     '''
@@ -408,7 +420,7 @@ def handle_getblock_reply(my_host, server_socket, json_response):
             insert_block(json_response)
         else:
             # handle any gossip response
-            handle_response(my_host, server_socket, json_response)
+            handle_response(addr, my_host, server_socket, json_response)
     
     #check current chain
     missing_blocks = find_missing_blocks(my_chain)
@@ -420,6 +432,7 @@ def handle_getblock_reply(my_host, server_socket, json_response):
         print(f"MISSING BLOCKS FOUND {missing_blocks}")
         request_missing_blocks(missing_blocks, consensus_peers)
     else:
+        global chain_valid
         chain_valid = validate_chain(my_chain)
         print(f"CHAIN VALIDATION {chain_valid}")
 
@@ -449,7 +462,7 @@ def handle_consensus(my_host, server_socket, json_response):
                 print(f"{stat} \n")
         #handle other requests, but dont handle other consensus
         elif msg_type != "STATS_REPLY" and msg_type != "CONSENSUS": 
-            handle_response(my_host, server_socket, json_response)
+            handle_response(addr, my_host, server_socket, json_response)
         else:
             print("CANT HANDLE OTHER CONSENSUS")
     
@@ -469,20 +482,21 @@ def my_server(my_host, my_port):
         #init gossip to well known host
         init_peer = Peer(SILICON_HOST, SILICON_PORT, None, None, server_socket)
         init_peer.gossip(my_host, my_port)
-        start_time = time.time()
+        start_time_gossip = time.time()
 
+        start_time_consensus = time.time()
         #init consensus, false because can't do consensus initially
         is_consensus = False
         while True:
             try:
                 #ping gossip every 30 secs
                 current_time = time.time()
-                elapsed_time = current_time - start_time
-                print(f"ELAPSE:{elapsed_time}")
-                ping = ping_gossip(my_host, my_port, elapsed_time)
+                elapsed_time_gossip = current_time - start_time_gossip
+                print(f"ELAPSE GOSSIP:{elapsed_time_gossip}")
+                ping = ping_gossip(my_host, my_port, elapsed_time_gossip)
                 if ping:
                     print("PING GOSSIP 30 SEC")
-                    start_time = time.time()
+                    start_time_gossip = time.time()
 
                 #get the data
                 data, addr = server_socket.recvfrom(1024)
@@ -490,23 +504,31 @@ def my_server(my_host, my_port):
                 print(f"\nReceived From {addr}, \ndata: {json_response}")
                 msg_type = json_response["type"]
 
-                #handle consensus
-                if msg_type == "CONSENSUS" and not is_consensus:
+                elapse_time_consensus = current_time - start_time_consensus
+                #handle consensus or repeat consensus every 1 min
+                print(f"ELAPSE CONSENSUS:{elapse_time_consensus}")
+                if ((msg_type == "CONSENSUS" or elapse_time_consensus >= CONSENSUS_REPEAT_DURATION) 
+                    and not is_consensus):
                     #starting consensus
                     is_consensus = True
+                    print("STARTING CONSENSUS 1 MIN")
+                    global my_chain
+                    my_chain = []
+                    global chain_valid
+                    chain_valid = False
                     handle_consensus(my_host, server_socket, json_response)
-                    print("ENDING CONSENSUS")
                     # finished consensus
                     is_consensus = False
+                    start_time_consensus = time.time()
                 elif msg_type == "GET_BLOCK_REPLY":
                     handle_getblock_reply(my_host, server_socket, json_response)
                 else: #handle any other response
-                    handle_response(my_host, server_socket, json_response)
-                    
+                    handle_response(addr, my_host, server_socket, json_response)
+                
+                print(chain_valid)
                 
             except TypeError as e:
                 print(f"Type Error: {e} {e.with_traceback()}")
-            
 
 
 def main():
