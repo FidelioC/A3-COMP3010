@@ -22,7 +22,9 @@ SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_DURATION = 10
+GETBLOCK_DURATION = 10
 
+consensus_peers = []
 my_chain = []
 
 class Peer:
@@ -65,6 +67,12 @@ class Peer:
         print(f"SENDING STAT MSG TO {self.peer_name, self.peer_host, self.peer_port}")
         stat_msg = {"type":"STATS"}
         self.sock.sendto(json.dumps(stat_msg).encode(), (self.peer_host, self.peer_port))
+
+    def send_getblock(self, block_height):
+        get_block_msg = {"type": "GET_BLOCK", "height": block_height}
+        print(f"SENDING GET_BLOCK MSG: {get_block_msg} TO {self.peer_name, self.peer_host, self.peer_port}")
+
+        self.sock.sendto(json.dumps(get_block_msg).encode(), (self.peer_host, self.peer_port))
 
     def __str__(self):
         return str(self.to_json())
@@ -175,7 +183,7 @@ def do_gossip(my_host, server_socket, json_response):
 
     #send gossip message to all peers exactly once
     foward_messages(json_response, my_host)
-    print(print_peers())
+    # print(print_peers())
 
 def ping_gossip(my_host, my_port, elapsed_time):
     # gossip to 3 different random hosts from list
@@ -209,12 +217,74 @@ def do_consensus(stats_replies):
 
     for list in consensus_list:
         print(f"{list} \n")
+    
+    return consensus_list
 
-def do_getblock():
+def do_getallblocks(consensus_list):
     '''
-    get block from peers
+    get block from peers in a load balance way
     '''
+    curr_height = 0
+    max_height = consensus_list[0]["height"]
+    # load balance get block request
+    while(curr_height <= max_height):
+        for peer in consensus_list:
+            peer_obj = get_peer_by_addr(peer["host"], peer["port"])
+            peer_obj.send_getblock(curr_height)
+            curr_height += 1
 
+def block_format(json_response):
+    block = {
+        "hash": json_response["hash"],
+        "height": json_response["height"],
+        "messages": json_response["messages"],
+        "minedBy": json_response["minedBy"],
+        "nonce": json_response["nonce"],
+        "timestamp": json_response["timestamp"]
+    }
+    return block
+
+def insert_block(get_block_reply):
+    block_height = get_block_reply["height"]
+
+    if block_height != None:
+        # find index to insert block
+        index = 0
+        while index < len(my_chain) and my_chain[index]["height"] < block_height:
+            index += 1
+
+        #insert block
+        my_chain.insert(index, block_format(get_block_reply))
+
+def find_missing_blocks(current_chain):
+    missing_blocks = []
+    for i in range(len(current_chain) - 1):
+        current_element = current_chain[i]["height"]
+        next_element = current_chain[i + 1]["height"]
+
+        # Check if there is a gap between current_element and next_element
+        if next_element - current_element > 1:
+            # Insert missing block into the result list
+            for block in range(current_element + 1, next_element):
+                missing_blocks.append(block)
+    
+    return missing_blocks
+
+def request_missing_blocks(missing_blocks, consensus_list):
+    '''
+    get missing blocks from peers in a load balance way
+    '''
+    total_missing = len(missing_blocks)
+    # if there's missing blocks
+    if total_missing > 0:
+        curr_index = 0
+        # load balance get block request
+        while(curr_index < total_missing):
+            for peer in consensus_list:
+                peer_obj = get_peer_by_addr(peer["host"], peer["port"])
+                peer_obj.send_getblock(missing_blocks[curr_index])
+                curr_index += 1 
+    
 def get_consensus_list(stats_replies):
     return find_majority_hash(find_max_height(stats_replies))
 
@@ -240,7 +310,47 @@ def handle_response(my_host, server_socket, json_response):
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
         do_gossip(my_host, server_socket, json_response)
+        
 
+def handle_getblock_reply(my_host, server_socket, json_response):
+    '''
+    after receiving the 1st get block reply, 
+    we want to make timeout and see how many replies we got in a time.
+    validate and resend if there's block missing
+    '''
+    #insert 1st get block
+    insert_block(json_response)
+    finish_getblock_time = time.time() + GETBLOCK_DURATION
+    while time.time() <= finish_getblock_time:
+        #try getting any data during this time
+        print("RECEIVING REPLY GETBLOCK")
+        data, addr = server_socket.recvfrom(1024)
+        json_response = json.loads(data)
+        print(f"\nReceived From {addr}, \ndata: {json_response}")
+        msg_type = json_response["type"]
+        if msg_type == "GET_BLOCK_REPLY":
+            insert_block(json_response)
+        else:
+            # handle any gossip response
+            handle_response(my_host, server_socket, json_response)
+    
+    #check current chain
+    missing_blocks = find_missing_blocks(my_chain)
+
+    # request missing blocks until all filled,
+    # request will be sent, and will be received back in the main loop
+    # then, check missing blocks again
+    if len(missing_blocks) > 0:
+        print(f"MISSING BLOCKS FOUND {missing_blocks}")
+        request_missing_blocks(missing_blocks, consensus_peers)
+    else:
+        "no more missing blocks. validate chain with crypto"
+
+    print("MY CURRENT CHAIN: ")
+    for block in my_chain:
+        print(f"{block}\n")
+
+    
 def handle_consensus(my_host, server_socket, json_response):
     finish_consensus_time = time.time() + CONSENSUS_DURATION
     # send stats to all peers at once
@@ -268,7 +378,10 @@ def handle_consensus(my_host, server_socket, json_response):
             print("CANT HANDLE OTHER CONSENSUS")
     
     #after getting all stats reply, do consensus
-    do_consensus(stats_replies)
+    consensus_list = do_consensus(stats_replies)
+    consensus_peers.extend(consensus_list)
+    #get all blocks
+    do_getallblocks(consensus_list)
 
 def my_server(my_host, my_port):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
@@ -306,15 +419,18 @@ def my_server(my_host, my_port):
                     #starting consensus
                     is_consensus = True
                     handle_consensus(my_host, server_socket, json_response)
-                    print("ENDING REPLIES STATS")
+                    print("ENDING CONSENSUS")
                     # finished consensus
                     is_consensus = False
+                elif msg_type == "GET_BLOCK_REPLY":
+                    handle_getblock_reply(my_host, server_socket, json_response)
                 else: #handle any other response
                     handle_response(my_host, server_socket, json_response)
                     
                 
             except TypeError as e:
-                print(f"Type Error: {e}")
+                print(f"Type Error: {e} {e.with_traceback()}")
+            
 
 
 def main():
