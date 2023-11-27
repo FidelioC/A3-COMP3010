@@ -72,13 +72,13 @@ def test_getconsensuslist():
 
 def test_findmissingblock():
     chain = [
-        {'hash': '5b0cc813303f305927dbaf559bebab19229ba30106687a61ed4c62d000000000', 'height': 1, 'messages': ["wiz's", 'shrouded', 'regenerates', "reconnaissance's", 'penitence'], 'minedBy': 'Prof!', 'nonce': '2251755442', 'timestamp': 1700636371},
+        {'hash': '5b0cc813303f305927dbaf559bebab19229ba30106687a61ed4c62d000000000', 'height': 0, 'messages': ["wiz's", 'shrouded', 'regenerates', "reconnaissance's", 'penitence'], 'minedBy': 'Prof!', 'nonce': '2251755442', 'timestamp': 1700636371},
         {'hash': '6e242a9cb5822240f8de04a6b7a7ce9813a9587eb9cf621dcca93bb000000000', 'height': 2, 'messages': ['overanimated'], 'minedBy': 'GossipZilla!', 'nonce': '2083334054052021', 'timestamp': 1700655104},
         {'hash': 'bb02ecf8b3ff4bb3e18ff08217c6d3429895da1f34833888fee339e000000000', 'height': 4, 'messages': ['fly-stuck'], 'minedBy': 'GossipZilla!', 'nonce': '4583335277304293', 'timestamp': 1700656987},
         {'hash': 'c156db5000397adbfbf068c16e469ff9dcf083c896a1688b17708b5000000000', 'height': 8, 'messages': ['Bontocs', 'waivers'], 'minedBy': 'GossipZilla!', 'nonce': '208333437970814', 'timestamp': 1700662569},
         {'hash': '8a2fa39a68461965b19aedd0544674d916d91872f8b545115043742000000000', 'height': 10, 'messages': ['gymnotid', 'Leupold'], 'minedBy': 'GossipZilla!', 'nonce': '4583333401198356', 'timestamp': 1700671783},
     ]
-    missing_blocks = peer.find_missing_blocks(chain)
+    missing_blocks = peer.find_missing_blocks(chain, 20)
     for block in missing_blocks:
         print(f"{block}")
 
@@ -129,8 +129,8 @@ def main():
     # test_removepeer()
     # test_findmaxheight()
     # test_find_majority_hash()
-    test_getconsensuslist()
-    # test_findmissingblock()
+    # test_getconsensuslist()
+    test_findmissingblock()
     # test_validate_block()
     # test_validate_chain()
 
