@@ -8,16 +8,13 @@ import hashlib
 # TODO:
 # 1. GOSSIP (done)
 # 2. Consensus (done)
-# 3. Create Chain
-    # from the consesus_list, 
-    # iterate one by one, load balance each block until current height 
-    # save that block to the blocklist 
-    # now, after receving all those blocks, validate it using cryptography
-
+# 3. Create Chain (done)
 # 4. Add Block
 
-# echo '{"type": "GOSSIP", "host": "130.179.28.110", "port": 8999, "id": 1, "name": "Hello World!",}' | nc -u 130.179.28.37 8999
+# notes: still have some edge cases to be handled at consensus
+# still has some small bugs
 
+# get block reply
 MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
@@ -293,7 +290,45 @@ def request_missing_blocks(missing_blocks, consensus_list):
                     curr_index += 1 
     
 def get_consensus_list(stats_replies):
-    return find_majority_hash(find_max_height(stats_replies))
+    replies_with_majority_hash = find_majority_hash(stats_replies)
+
+    highest_height = find_max_height(stats_replies, replies_with_majority_hash)
+    # Find replies with the most common combination and the highest height
+    majority_replies = [
+        entry for entry in stats_replies
+        if (entry['hash'], entry['height']) == replies_with_majority_hash and entry['height'] == highest_height
+    ]
+
+    return majority_replies
+
+def find_max_height(stats_replies, replies_majority):
+    # Find the maximum height
+    highest_height = None
+    for stat in stats_replies:
+        if (stat['hash'], stat['height']) == replies_majority:
+            current_height = stat['height']
+
+            if highest_height is None:
+                highest_height = current_height
+            else:
+                highest_height = max(highest_height, current_height)
+
+    return highest_height
+
+def find_majority_hash(stats_replies):
+    hash_height_counts = {}
+    # count each hash, height appearance
+    for stat in stats_replies:
+        hash_height = (stat['hash'], stat['height'])
+
+        if hash_height in hash_height_counts:
+            hash_height_counts[hash_height] += 1
+        else:
+            hash_height_counts[hash_height] = 1
+    
+    # Find the highest hash count
+    replies_with_majority_hash = max(hash_height_counts, key=hash_height_counts.get)
+    return replies_with_majority_hash
 
 def validate_chain(current_chain):
     '''
@@ -364,26 +399,6 @@ def validate_block(current_block, prev_block):
     else:
         return False
 
-
-def find_max_height(stats_replies):
-    # Find the maximum height
-    if len(stats_replies) > 0:
-        max_height = max(entry['height'] for entry in stats_replies)
-        return [entry for entry in stats_replies if entry['height'] == max_height]
-
-def find_majority_hash(stats_replies):
-    hash_counts = {}
-    for entry in stats_replies:
-        current_hash = entry['hash']
-        hash_counts[current_hash] = hash_counts.get(current_hash, 0) + 1
-
-    # Find the majority hash
-    majority_hash = max(hash_counts, key=hash_counts.get)
-
-    # Filter entries with the majority hash
-    entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
-    return entries_with_majority_hash
-    
 def handle_response(addr, my_host, server_socket, json_response):
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":

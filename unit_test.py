@@ -61,10 +61,10 @@ def test_getconsensuslist():
     stats_reply_list = [
         {'type': 'STATS_REPLY', 'height': 140, 'hash': 'adada', 'host': '130.179.28.134', 'port': 8472},
         {'type': 'STATS_REPLY', 'height': 140, 'hash': 'adada', 'host': '130.179.28.37', 'port': 8999},
-        {'type': 'STATS_REPLY', 'height': 140, 'hash': 'adada', 'host': '130.179.28.117', 'port': 8999},
-        {'type': 'STATS_REPLY', 'height': 140, 'hash': '8ffac79219d5a071d3223fa0a67bf1c1a725c22cca2c4d0d93d685f000000000', 'host': '10.152.152.40', 'port': 8750},
-        {'type': 'STATS_REPLY', 'height': 140, 'hash': 'qwdwqdqwdqwdwdq', 'host': '130.179.28.127', 'port': 8999},
-        {'type': 'STATS_REPLY', 'height': 130, 'hash': '8ffac79219d5a071d3223fa0a67bf1c1a725c22cca2c4d0d93d685f000000000', 'host': '130.179.28.129', 'port': 8999}
+        {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '130.179.28.117', 'port': 8999},
+        {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '10.152.152.40', 'port': 8750},
+        {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '130.179.28.127', 'port': 8999},
+        {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '130.179.28.129', 'port': 8999}
     ]
     lists = peer.get_consensus_list(stats_reply_list)
     for list in lists:
@@ -129,10 +129,10 @@ def main():
     # test_removepeer()
     # test_findmaxheight()
     # test_find_majority_hash()
-    # test_getconsensuslist()
+    test_getconsensuslist()
     # test_findmissingblock()
     # test_validate_block()
-    test_validate_chain()
+    # test_validate_chain()
 
 
 if __name__ == "__main__":
