@@ -9,11 +9,13 @@ import hashlib
 # 1. GOSSIP (done)
 # 2. Consensus (done)
 # 3. Create Chain (done)
-# 4. Add Block
-    # get block reply
-    # handle announce 
-    # if consensus and got any other consensus or stat reply, just reply with "still doing consensus"
-    # make consensus if there is at list 1 peer in the current peer list.
+# 4. Add Block (done)
+
+#possible TODO:
+# consensus heighest height first, then check if valid,
+# if not valid, insert that peer to blacklist
+
+#separate code
 
 MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
@@ -54,7 +56,7 @@ class Peer:
             "host": my_host,
             "port": my_port,
             "id": str(uuid.uuid4()),
-            "name": "yeet",
+            "name": "fid",
         }
 
         self.sock.sendto(json.dumps(gossip_message).encode(), (self.peer_host, self.peer_port))
@@ -138,7 +140,7 @@ def send_gossip_reply(my_host, server_socket, gossip_message):
         "type": "GOSSIP_REPLY",
         "host": my_host,
         "port": MY_PORT,
-        "name": "yeet"
+        "name": "fid"
     }
 
     host_original = gossip_message["host"]
@@ -417,7 +419,20 @@ def handle_response(addr, my_host, server_socket, json_response):
         handle_stats_reply(addr, server_socket)
     elif msg_type == "GET_BLOCK" and chain_valid:
         handle_getblock(addr, server_socket, json_response)
+    elif msg_type == "ANNOUNCE" and chain_valid:
+        handle_announce(json_response, my_chain)
 
+def handle_announce(json_response, current_chain):
+    del json_response["type"]
+    new_block = json_response
+    # validate block with the last block
+    is_validated = validate_block(new_block, current_chain[len(my_chain)-1])
+    if is_validated:
+        current_chain.append(new_block)
+        return True
+    else:
+        return False
+    
 def handle_getblock(addr, server_socket, json_response):
     height_requested = json_response["height"]
     block_reply = {}
@@ -473,8 +488,6 @@ def handle_getblock_reply(my_host, server_socket, json_response):
             if addr not in blacklisted_peers:
                 blacklisted_peers.append(addr)
 
-        
-    
     print("MY CURRENT CHAIN: ")
     for block in my_chain:
         print(f"{block}\n")
@@ -564,7 +577,8 @@ def my_server(my_host, my_port):
         init_peer.gossip(my_host, my_port)
         start_time_gossip = time.time()
 
-        start_time_consensus = time.time()
+        # do consensus if possible for the 1st time
+        start_time_consensus = time.time() - CONSENSUS_REPEAT_DURATION
         #init consensus, false because can't do consensus initially
         is_consensus = False
         while True:
@@ -585,10 +599,11 @@ def my_server(my_host, my_port):
                 msg_type = json_response["type"]
 
                 elapse_time_consensus = current_time - start_time_consensus
-                #handle consensus or repeat consensus every 1 min
+                #handle consensus or repeat consensus every 1 min 
+                # will do consensus if only have at least 3 peers
                 print(f"ELAPSE CONSENSUS:{elapse_time_consensus}")
                 if ((msg_type == "CONSENSUS" or elapse_time_consensus >= CONSENSUS_REPEAT_DURATION) 
-                    and not is_consensus):
+                    and not is_consensus and len(peer_obj_list) >= 3):
                     #starting consensus
                     is_consensus = True
                     # print("STARTING CONSENSUS 1 MIN")

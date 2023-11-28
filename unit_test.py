@@ -123,6 +123,38 @@ def test_validate_chain():
     ]
     print(f"VALIDATE CHAIN {peer.validate_chain(curr_chain)}")
 
+def test_handleannounce():
+    current_chain = [
+        {'hash': 'da32c5e6d1478caad5c39eea5f05855daed3bda5980da4633aa1e5c000000000', 
+             'height': 0, 
+             'messages': ['3010 rocks', 
+                          'Warning:', 
+                          'Procrastinators', 
+                          'will be sent back', 
+                          'in time to start', 
+                          'early.', 
+                          'Chain 2'], 
+             'minedBy': 'Prof!', 
+             'nonce': '742463477029129', 
+             'timestamp': 1700629652},
+        ]
+    response = {
+        'type': 'ANNOUNCE',
+        'hash': '5b0cc813303f305927dbaf559bebab19229ba30106687a61ed4c62d000000000', 
+                  'height': 1, 
+                  'messages': ["wiz's", 
+                               'shrouded', 
+                               'regenerates', 
+                               "reconnaissance's", 
+                               'penitence'], 
+                   'minedBy': 'Prof!', 
+                   'nonce': '2251755442', 
+                   'timestamp': 1700636371
+    }
+
+    peer.handle_announce(response, current_chain)
+    print(current_chain)
+
 def main():
     # test_getpeer()
     # test_renewtimeout()
@@ -132,7 +164,8 @@ def main():
     # test_getconsensuslist()
     # test_findmissingblock()
     # test_validate_block()
-    test_validate_chain()
+    # test_validate_chain()
+    test_handleannounce()
 
 
 
