@@ -14,6 +14,7 @@ import hashlib
     # handle announce 
     # if consensus and got any other consensus or stat reply, just reply with "still doing consensus"
     # make consensus if there is at list 1 peer in the current peer list.
+    # if my chain hash and height are still the same with consensus results,  then no need to do all get blocks
 
 MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
@@ -189,7 +190,7 @@ def do_gossip(my_host, server_socket, json_response):
 
 def ping_gossip(my_host, my_port, elapsed_time):
     # gossip to 3 different random hosts from list
-    if elapsed_time >= GOSSIP_REPEAT_DURATION:
+    if elapsed_time >= GOSSIP_REPEAT_DURATION and len(peer_obj_list) > 2:
         random_hosts = random.sample(peer_obj_list, 2)
         # print(f"GOSSIPING TO: {random_hosts}")
         for host in random_hosts:
@@ -475,6 +476,17 @@ def handle_getblock_reply(my_host, server_socket, json_response):
     # for block in my_chain:
     #     print(f"{block}\n")
     
+def check_reply_mychain(consensus_list):
+    '''
+    check if my chain is still in sync with others chain
+    '''
+    if (consensus_list[0]["height"] == len(my_chain) 
+        and consensus_list[0]["hash"] == my_chain[len(my_chain)-1]["hash"]):
+        return True
+    else:
+        return False
+
+
 def handle_consensus(my_host, server_socket, json_response):
     finish_consensus_time = time.time() + CONSENSUS_DURATION
     # send stats to all peers at once
@@ -505,13 +517,19 @@ def handle_consensus(my_host, server_socket, json_response):
     consensus_list = do_consensus(stats_replies)
     global consensus_peers
     consensus_peers = consensus_list
-
+    
     print(f"CONSENSUS PEERS: {consensus_peers}")
     for peer in consensus_peers:
         print(peer)
 
-    #get all blocks
-    do_getallblocks(consensus_peers)
+    if not check_reply_mychain(consensus_list):
+        #get all blocks
+        print("CHAIN IS DIFFERENT, GETTING ALL BLOCKS")
+        do_getallblocks(consensus_peers)
+        global my_chain
+        my_chain = []
+        global chain_valid
+        chain_valid = False
 
 def my_server(my_host, my_port):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
@@ -553,10 +571,7 @@ def my_server(my_host, my_port):
                     #starting consensus
                     is_consensus = True
                     # print("STARTING CONSENSUS 1 MIN")
-                    global my_chain
-                    my_chain = []
-                    global chain_valid
-                    chain_valid = False
+                    
                     handle_consensus(my_host, server_socket, json_response)
                     # finished consensus
                     is_consensus = False
@@ -574,7 +589,7 @@ def my_server(my_host, my_port):
                 print(f"BLACKLISTED PEERS: {blacklisted_peers}")
                 
             except TypeError as e:
-                print(f"Type Error:. {e}{e.with_traceback()}")
+                print(f"Type Error:. {e}")
                 is_consensus = False
             
             except KeyError as e:
