@@ -130,9 +130,10 @@ def main():
     # test_findmaxheight()
     # test_find_majority_hash()
     # test_getconsensuslist()
-    test_findmissingblock()
+    # test_findmissingblock()
     # test_validate_block()
-    # test_validate_chain()
+    test_validate_chain()
+
 
 
 if __name__ == "__main__":

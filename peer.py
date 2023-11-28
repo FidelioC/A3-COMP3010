@@ -14,7 +14,6 @@ import hashlib
     # handle announce 
     # if consensus and got any other consensus or stat reply, just reply with "still doing consensus"
     # make consensus if there is at list 1 peer in the current peer list.
-    # if my chain hash and height are still the same with consensus results,  then no need to do all get blocks
 
 MY_PORT = 8759
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
@@ -416,7 +415,29 @@ def handle_response(addr, my_host, server_socket, json_response):
         do_gossip(my_host, server_socket, json_response)
     elif msg_type == "STATS" and chain_valid:
         handle_stats_reply(addr, server_socket)
-        
+    elif msg_type == "GET_BLOCK" and chain_valid:
+        handle_getblock(addr, server_socket, json_response)
+
+def handle_getblock(addr, server_socket, json_response):
+    height_requested = json_response["height"]
+    block_reply = {}
+    if height_requested in range(len(my_chain)):
+        block_reply = my_chain[height_requested]
+        block_reply["type"] = "GET_BLOCK_REPLY"
+    else:
+        block_reply = {   
+            'type': 'GET_BLOCK_REPLY',
+            'hash': 'None',
+            'height': 'None',
+            'messages': 'None',
+            'minedBy': 'None',
+            'nonce': 'None',
+            'timestamp': 'None',
+        }
+    
+    server_socket.sendto(json.dumps(block_reply).encode(), (addr[0], addr[1]))
+
+
 def handle_stats_reply(addr, server_socket):
     stats_reply_msg = {
         "type": "STATS_REPLY",
@@ -599,6 +620,11 @@ def my_server(my_host, my_port):
             except UnboundLocalError as e:
                 print(f"Unbound local error")
                 is_consensus = False
+            
+            except json.decoder.JSONDecodeError as e:
+                print(f"Json decoder error")
+                is_consensus = False
+
 
 
 
