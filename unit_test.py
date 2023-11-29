@@ -59,7 +59,7 @@ def test_find_majority_hash():
 def test_getconsensuslist():
     # Example usage
     stats_reply_list = [
-        {'type': 'STATS_REPLY', 'height': 140, 'hash': 'adada', 'host': '130.179.28.134', 'port': 8472},
+        {'type': 'STATS_REPLY', 'height': 2000, 'hash': 'adada', 'host': '130.179.28.134', 'port': 8472},
         {'type': 'STATS_REPLY', 'height': 140, 'hash': 'adada', 'host': '130.179.28.37', 'port': 8999},
         {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '130.179.28.117', 'port': 8999},
         {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '10.152.152.40', 'port': 8750},
@@ -94,6 +94,7 @@ def test_validate_block():
                           'Chain 2'], 
              'minedBy': 'Prof!', 
              'nonce': '742463477029129', 
+             'addr': '3',
              'timestamp': 1700629652}
     
     next_block = {'hash': '5b0cc813303f305927dbaf559bebab19229ba30106687a61ed4c62d000000000', 
@@ -110,7 +111,7 @@ def test_validate_block():
     block79 = {'hash': '0eb8fd66cb4f1937f5ccfb1a661955bb42c7168ef300baef191e057000000000', 'height': 79, 'messages': ['PSI'], 'minedBy': 'GossipZilla!', 'nonce': '2500000301125418', 'timestamp': 1700822662}
     print(f"MESSAGE {peer.validate_block_messages(block80['messages'])}")
     print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
-    print(f"VALIDATE BLOCK {peer.validate_block(next_block, block)}")
+    print(f"VALIDATE BLOCK {peer.validate_block(block, None)}")
 
 def test_validate_chain():
     curr_chain = [
@@ -161,11 +162,11 @@ def main():
     # test_removepeer()
     # test_findmaxheight()
     # test_find_majority_hash()
-    # test_getconsensuslist()
+    test_getconsensuslist()
     # test_findmissingblock()
     # test_validate_block()
     # test_validate_chain()
-    test_handleannounce()
+    # test_handleannounce()
 
 
 
