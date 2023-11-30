@@ -4,6 +4,8 @@ import uuid
 import time
 import random
 import hashlib
+import argparse
+import miner
 
 # TODO:
 # 1. GOSSIP (done)
@@ -13,15 +15,17 @@ import hashlib
 
 #possible TODO:
 #separate code
+# miner 
 
-MY_PORT = 8759
-SILICON_HOST, SILICON_PORT = "goose.cs.umanitoba.ca", 8999
+SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 5
 GETBLOCK_DURATION = 5
 DIFFICULTY = 9
+
+MINER_TIMEOUT = 0.1
 
 consensus_peers = []
 my_chain = []
@@ -107,11 +111,10 @@ def check_timeout(curr_peer:Peer, time):
     else:
         return False
 
-def print_peers():
-    print("CURRENT PEERS IN THE LIST:")
-    for peer in peer_obj_list:
-        if peer != None:
-            print(peer)
+def print_list(my_list):
+    for entry in my_list:
+        if entry != None:
+            print(entry)
 
 # check if peer inside list
 def is_peer_list(gossip_message):
@@ -132,11 +135,11 @@ def is_peer_myself(gossip_message, my_host, my_port):
     else:
         return False
 
-def send_gossip_reply(my_host, server_socket, gossip_message):
+def send_gossip_reply(my_host, my_port, server_socket, gossip_message):
     gossip_reply = {
         "type": "GOSSIP_REPLY",
         "host": my_host,
-        "port": MY_PORT,
+        "port": my_port,
         "name": "duolingo"
     }
 
@@ -162,13 +165,13 @@ def add_peer_list(my_host, my_port, gossip_message, sock):
         peer_object = Peer(gossip_message["host"], gossip_message["port"], gossip_message["name"], gossip_message["id"], sock)
         peer_obj_list.append(peer_object)
 
-def foward_messages(gossip_message, my_host):
+def foward_messages(gossip_message, my_host, my_port):
     for peer in peer_obj_list:
         #ignore own messages
-        if not is_peer_myself(gossip_message, my_host, MY_PORT):
+        if not is_peer_myself(gossip_message, my_host, my_port):
             peer.forward_gossip_peer(gossip_message)
 
-def do_gossip(my_host, server_socket, json_response):
+def do_gossip(my_host, my_port, server_socket, json_response):
     # print("INSIDE GOSSIP")
     #handle peers -> renew peer timeout or remove peer
     print(f"CURRENT TIME: {time.time()}")
@@ -177,13 +180,13 @@ def do_gossip(my_host, server_socket, json_response):
     remove_peer(peer_obj_list, time.time())
 
     #add peer to list if not exist in peer list
-    add_peer_list(my_host, MY_PORT, json_response, server_socket)
+    add_peer_list(my_host, my_port, json_response, server_socket)
 
     #send back gossip reply
-    send_gossip_reply(my_host, server_socket, json_response)
+    send_gossip_reply(my_host, my_port, server_socket, json_response)
 
     #send gossip message to all peers exactly once
-    foward_messages(json_response, my_host)
+    foward_messages(json_response, my_host, my_port)
     # print(print_peers())
 
 def ping_gossip(my_host, my_port, elapsed_time):
@@ -391,10 +394,10 @@ def validate_block(current_block, prev_block):
         to_blacklist(block_addr, blacklisted_peers)
         return False
 
-def handle_response(addr, my_host, server_socket, json_response):
+def handle_response(addr, my_host, my_port, server_socket, json_response):
     msg_type = json_response["type"]
     if msg_type == "GOSSIP":
-        do_gossip(my_host, server_socket, json_response)
+        do_gossip(my_host, my_port, server_socket, json_response)
     elif msg_type == "STATS" and chain_valid:
         handle_stats_reply(addr, server_socket)
     elif msg_type == "GET_BLOCK" and chain_valid:
@@ -443,7 +446,7 @@ def handle_stats_reply(addr, server_socket):
     print(f"SENDING STATS REPLY: {stats_reply_msg} TO {addr}")
     server_socket.sendto(json.dumps(stats_reply_msg).encode(), (addr[0], addr[1]))
 
-def handle_getblock_reply(addr_first, my_host, server_socket, json_response):
+def handle_getblock_reply(addr_first, my_host, my_port, server_socket, json_response):
     '''
     after receiving the 1st get block reply, 
     we want to make timeout and see how many replies we got in a time.
@@ -504,7 +507,7 @@ def check_reply_mychain(consensus_list):
         return False
 
 
-def handle_consensus(my_host, server_socket, json_response):
+def handle_consensus(my_host, my_port, server_socket, json_response):
     finish_consensus_time = time.time() + CONSENSUS_DURATION
     # send stats to all peers at once
     send_stats()
@@ -527,7 +530,7 @@ def handle_consensus(my_host, server_socket, json_response):
                 print(f"{stat} \n")
         #handle other requests, but dont handle other consensus
         elif msg_type != "STATS_REPLY" and msg_type != "CONSENSUS": 
-            handle_response(addr, my_host, server_socket, json_response)
+            handle_response(addr, my_host, my_port, server_socket, json_response)
         else:
             print("CANT HANDLE OTHER CONSENSUS")
         
@@ -558,10 +561,23 @@ def to_blacklist(addr, blacklisted_list):
     if addr not in blacklisted_list:
         blacklisted_list.append(addr)
 
-def my_server(my_host, my_port):
+
+def my_server(my_host, my_port, miners):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
-        
         server_socket.bind((my_host, my_port))
+        # server_socket.setblocking(False)
+
+        my_miners = []
+        miner.insert_miner(miners, my_miners)
+        print("MY MINERS:")
+        print_list(my_miners)
+        miner_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        miner_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        #different port for miner
+        miner_socket.bind((my_host, 9001))
+        miner_socket.listen(0)
+        miner_socket.settimeout(MINER_TIMEOUT)
+
 
         print(f"Server listening on host {my_host} and PORT {my_port}")
 
@@ -574,8 +590,13 @@ def my_server(my_host, my_port):
         start_time_consensus = time.time() - CONSENSUS_REPEAT_DURATION
         #init consensus, false because can't do consensus initially
         is_consensus = False
+
+        is_mining = False
         while True:
             try:
+                '''
+                HANDLE PEER SERVER 
+                '''
                 #ping gossip every 30 secs
                 current_time = time.time()
                 elapsed_time_gossip = current_time - start_time_gossip
@@ -601,44 +622,72 @@ def my_server(my_host, my_port):
                     is_consensus = True
                     # print("STARTING CONSENSUS 1 MIN")
                     
-                    start_time_consensus = handle_consensus(my_host, server_socket, json_response)
+                    start_time_consensus = handle_consensus(my_host, my_port, server_socket, json_response)
                     # finished consensus
                     is_consensus = False
                 elif msg_type == "GET_BLOCK_REPLY":
-                    handle_getblock_reply(addr, my_host, server_socket, json_response)
+                    handle_getblock_reply(addr, my_host, my_port, server_socket, json_response)
                 else: #handle any other response
-                    handle_response(addr, my_host, server_socket, json_response)
+                    handle_response(addr, my_host, my_port, server_socket, json_response)
                 
                 print(f"CHAIN VALID: {chain_valid}")
-                # print("MY CURRENT CHAIN: ")
-                # for block in my_chain:
-                #     print(f"{block}\n")
-
                 print(f"BLACKLISTED PEERS: {blacklisted_peers}")
-                print(f"CONSENSUS PEERS: {consensus_peers}")
+                # print(f"CONSENSUS PEERS: {consensus_peers}")
+
+                '''
+                HANDLE MINER 
+                '''
+                if chain_valid and not is_mining:
+                    for entry in my_miners:
+                        entry.send_maxblock_miner(my_chain[len(my_chain)-1])
+                    
+                    is_mining = True
+                try:
+                    miner_conn, miner_addr = miner_socket.accept()
+                    miner_data = json.loads(miner_conn.recv(1024).decode())
+                    print(miner_data)
+                except socket.timeout:
+                    print(f"No activity in {MINER_TIMEOUT} seconds.")
+                    continue
+                    
 
             except TypeError as e:
                 print(f"Type Error:. {e}")
                 is_consensus = False
 
-            except KeyError as e:
-                print(f"Key error {e}")
-                is_consensus = False
-
-            # except UnboundLocalError as e:
-            #     print(f"Unbound local error {e}")
+            # except KeyError as e:
+            #     print(f"Key error {e}")
             #     is_consensus = False
+
+            # # except UnboundLocalError as e:
+            # #     print(f"Unbound local error {e}")
+            # #     is_consensus = False
 
             except json.decoder.JSONDecodeError as e:
                 print(f"Json decoder error {e}")
                 is_consensus = False
 
+def parse_miners(input):
+    worker_list = []
+    for worker in input:
+        host, port = worker.split(":")
+        worker_list.append((host, int(port)))
+    return worker_list
+
 def main():
-    hostname = socket.gethostname()
     # Get the IP address associated with the local hostname
-    local_ip = socket.gethostbyname(hostname)
-    # umber = "192.168.101.248"
-    my_server(local_ip, MY_PORT)
+    my_host = socket.gethostbyname(socket.gethostname())
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("port", type=int)
+    parser.add_argument("workers", nargs="+")
+
+    args = parser.parse_args()
+
+    port = args.port
+    miners = parse_miners(args.workers)
+
+    my_server(my_host, port, miners)
 
 if __name__ == "__main__":
     main()
