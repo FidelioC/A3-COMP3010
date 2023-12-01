@@ -1,5 +1,6 @@
 import peer
 import time
+import miner
 def test_getpeer():
     peer_obj_list = []
     peer_obj = peer.Peer("test","test","name",1)
@@ -59,7 +60,7 @@ def test_find_majority_hash():
 def test_getconsensuslist():
     # Example usage
     stats_reply_list = [
-        {'type': 'STATS_REPLY', 'height': 2000, 'hash': 'adada', 'host': '130.179.28.134', 'port': 8472},
+        {'type': 'STATS_REPLY', 'height': 0, 'hash': 'adada', 'host': '130.179.28.134', 'port': 8472},
         {'type': 'STATS_REPLY', 'height': 140, 'hash': 'adada', 'host': '130.179.28.37', 'port': 8999},
         {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '130.179.28.117', 'port': 8999},
         {'type': 'STATS_REPLY', 'height': 139, 'hash': 'adada', 'host': '10.152.152.40', 'port': 8750},
@@ -111,7 +112,7 @@ def test_validate_block():
     block79 = {'hash': '0eb8fd66cb4f1937f5ccfb1a661955bb42c7168ef300baef191e057000000000', 'height': 79, 'messages': ['PSI'], 'minedBy': 'GossipZilla!', 'nonce': '2500000301125418', 'timestamp': 1700822662}
     print(f"MESSAGE {peer.validate_block_messages(block80['messages'])}")
     print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
-    print(f"VALIDATE BLOCK {peer.validate_block(block, None)}")
+    print(f"VALIDATE BLOCK {peer.validate_block(next_block, block)}")
 
 def test_validate_chain():
     curr_chain = [
@@ -156,17 +157,37 @@ def test_handleannounce():
     peer.handle_announce(response, current_chain)
     print(current_chain)
 
+def test_mineblock():
+    prev_block = {   'hash': 'da32c5e6d1478caad5c39eea5f05855daed3bda5980da4633aa1e5c000',
+    'height': 0,
+    'messages': [   '3010 rocks',
+                    'Warning:',
+                    'Procrastinators',
+                    'will be sent back',
+                    'in time to start',
+                    'early.',
+                    'Chain 2'],
+    'minedBy': 'Prof!',
+    'nonce': '742463477029129',
+    'timestamp': 1700629652,
+    'type': 'GET_BLOCK_REPLY'}
+    
+    block = miner.mine_block(prev_block, "test", 3)
+    print(block)
+    print(f"validating block: {peer.validate_block(block, prev_block)}")
+
 def main():
     # test_getpeer()
     # test_renewtimeout()
     # test_removepeer()
     # test_findmaxheight()
     # test_find_majority_hash()
-    test_getconsensuslist()
+    # test_getconsensuslist()
     # test_findmissingblock()
     # test_validate_block()
     # test_validate_chain()
     # test_handleannounce()
+    test_mineblock()
 
 
 

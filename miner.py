@@ -2,6 +2,11 @@ import argparse
 import socket
 import json
 import sys
+import time
+import peer
+import hashlib
+max_block = None
+DIFFICULTY = 1
 
 class Miner:
     def __init__(self, miner_host = None, miner_port = None):
@@ -9,6 +14,7 @@ class Miner:
         self.miner_port = miner_port
 
     def send_maxblock_miner(self, max_block):
+        max_block["type"] = "MAX_BLOCK"
         #send current max block to miner
         print(f"SENDING MAX BLOCK TO WORKER PORT: {self.miner_port}, MESSAGE SEND: {max_block}")
         request_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -33,6 +39,39 @@ def insert_miner(miner_inputs, miner_list):
     for miner_input in miner_inputs:
         miner_list.append(miners_to_object(miner_input))
 
+def handle_newword(json_response, difficulty, conn):
+    new_word = json_response["type"]
+    block_mined = mine_block(max_block, new_word, difficulty)
+    block_mined["type"] = "ANNOUNCE"
+    conn.send(json.dumps(block_mined).encode())
+
+def handle_maxblock(json_response):
+    global max_block
+    del json_response["type"]
+    max_block = json_response
+
+def mine_block(previous_block, messages, difficulty):
+    new_block = {
+        "height" : previous_block["height"] + 1,
+        "messages": messages,
+        "minedBy": "Bowser Jr.",
+        "timestamp": int(time.time())
+    }
+    new_block['hash'] = previous_block['hash']
+
+    nonce = '0'
+    new_block['nonce'] = nonce
+    nonce_found = False
+    while not nonce_found:
+        nonce = str(int(nonce) + 1)
+        new_block['nonce'] = nonce
+        hashBase = peer.get_block_hash(new_block, previous_block)
+        if hashBase[-1 * difficulty:] == '0' * difficulty:
+            new_block["hash"] = hashBase
+            nonce_found = True
+    
+    return new_block
+
 def socket_con_nothread(host, port_num):
     # create TCP stream
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
@@ -45,8 +84,14 @@ def socket_con_nothread(host, port_num):
                 client_connect, addr = server_socket.accept()
                 print("Connected by", addr)
 
-                data = json.loads(client_connect.recv(1024).decode())
-                print(f"Received: {data}\n")
+                json_response = json.loads(client_connect.recv(1024).decode())
+                print(f"Received: {json_response}\n")
+
+                msg_type = json_response["type"]
+                if msg_type == "MAX_BLOCK":
+                    handle_maxblock(json_response)
+                elif msg_type == "NEW_WORD":
+                    handle_newword(json_response, DIFFICULTY, client_connect)
 
                 client_connect.close()
 

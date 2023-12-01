@@ -37,7 +37,7 @@ class TestShell(cmd.Cmd):
                 socket.AF_INET, socket.SOCK_DGRAM)
             # bind to 0 will give us a "random" port
             self.sock.bind(('', 0))
-            self.sock.settimeout(5)
+            self.sock.settimeout(10)
 
             # We could print what socket we have
             # 0.0.0.0 is the "all interfaces" phony ip address
