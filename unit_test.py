@@ -193,3 +193,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# echo '{"type":"NEW_WORD", "word":"test"}' | nc -u kingfisher 8795
+''' echo '{"type":"MAX_BLOCK", "hash": "da32c5e6d1478caad5c39eea5f05855daed3bda5980da4633aa1e5c000000000", "height": 0, "messages": ["3010 rocks", "Warning:", "Procrastinators", "will be sent back", "in time to start", "early.", "Chain 2"], "minedBy": "Prof!", "nonce": "742463477029129", "timestamp": 1700629652}' | nc -u kingfisher 8795'''
+# echo '{"type":"CONSENSUS"}' | nc -u kingfisher 8795
+# echo '{"type":"STATS"}' | nc -u kingfisher 8795

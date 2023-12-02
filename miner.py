@@ -7,26 +7,23 @@ import peer
 import hashlib
 max_block = None
 DIFFICULTY = 1
+COORDINATOR_HOST = "kingfisher"
+COORDINATOR_PORT = 8795
 
 class Miner:
     def __init__(self, miner_host = None, miner_port = None):
         self.miner_host = miner_host
         self.miner_port = miner_port
+        self.is_mining = False
 
-    def send_maxblock_miner(self, max_block):
-        max_block["type"] = "MAX_BLOCK"
-        #send current max block to miner
-        print(f"SENDING MAX BLOCK TO WORKER PORT: {self.miner_port}, MESSAGE SEND: {max_block}")
-        request_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        request_socket.connect((self.miner_host, self.miner_port))
-        request_socket.send(json.dumps(max_block).encode())
-
-    def req_newword_miner(self, new_word):
+    def req_newword_miner(self, json_response):
         # send new word request to miner
-        print(f"SENDING NEW WORD TO WORKER PORT: {self.miner_port}, MESSAGE SEND: {new_word}")
+        print(f"\nSENDING MESSAGE TO WORKER PORT: {self.miner_port}, \nMESSAGE SEND: {json_response}\n")
         request_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         request_socket.connect((self.miner_host, self.miner_port))
-        request_socket.send(json.dumps(new_word).encode())
+        request_socket.send(json.dumps(json_response).encode())
+
+        return request_socket
 
     def __str__(self) -> str:
         return f"Miner host: {self.miner_host}, miner port: {self.miner_port}"
@@ -39,12 +36,12 @@ def insert_miner(miner_inputs, miner_list):
     for miner_input in miner_inputs:
         miner_list.append(miners_to_object(miner_input))
 
-def handle_newword(json_response, difficulty, conn):
-    new_word = json_response["type"]
+def handle_newword(json_response, difficulty, client_connect):
+    new_word = json_response["word"]
     block_mined = mine_block(max_block, new_word, difficulty)
     block_mined["type"] = "ANNOUNCE"
-    conn.send(json.dumps(block_mined).encode())
-
+    client_connect.send(json.dumps(block_mined).encode())
+    
 def handle_maxblock(json_response):
     global max_block
     del json_response["type"]
@@ -86,7 +83,7 @@ def socket_con_nothread(host, port_num):
 
                 json_response = json.loads(client_connect.recv(1024).decode())
                 print(f"Received: {json_response}\n")
-
+                
                 msg_type = json_response["type"]
                 if msg_type == "MAX_BLOCK":
                     handle_maxblock(json_response)
@@ -99,7 +96,7 @@ def socket_con_nothread(host, port_num):
                 print("Program Stopped. Interrupted by keyboard.")
                 sys.exit()
             except Exception as error_msg:
-                print(error_msg.with_traceback())
+                print(error_msg)
 
 
 def main():
