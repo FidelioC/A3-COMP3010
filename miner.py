@@ -7,8 +7,6 @@ import peer
 import hashlib
 max_block = None
 DIFFICULTY = 1
-COORDINATOR_HOST = "kingfisher"
-COORDINATOR_PORT = 8795
 
 class Miner:
     def __init__(self, miner_host = None, miner_port = None):
@@ -56,13 +54,15 @@ def mine_block(previous_block, messages, difficulty):
     }
     new_block['hash'] = previous_block['hash']
 
-    nonce = '0'
+    nonce = previous_block['nonce']
     new_block['nonce'] = nonce
     nonce_found = False
     while not nonce_found:
         nonce = str(int(nonce) + 1)
         new_block['nonce'] = nonce
         hashBase = peer.get_block_hash(new_block, previous_block)
+        print(f"nonce: {nonce}")
+        print(f"hashBase: {hashBase}")
         if hashBase[-1 * difficulty:] == '0' * difficulty:
             new_block["hash"] = hashBase
             nonce_found = True
