@@ -1,4 +1,4 @@
-import peer
+import peer_no_miner
 import time
 import miner
 def test_getpeer():
@@ -84,7 +84,16 @@ def test_findmissingblock():
         print(f"{block}")
 
 def test_validate_block():
-    block = {'hash': 'da32c5e6d1478caad5c39eea5f05855daed3bda5980da4633aa1e5c000000000', 
+    test_block = {
+    'previous_hash': 'dd0b5974756421d8ac0b3e3689bfbfcc1834b3b66a497f219301e9b000000000',
+    'minedBy': 'Bryce!',
+    'nonce': 'b8UFVqxRE7NiluyHvyVe',
+    'messages': [
+        'tiptoeing', 'audiophiles', "wick's", 'alight', "crimp's", 'waif', 'aisles', 'Mahdi', 'Final3'
+    ],
+    'timestamp': 1701815848
+    }
+    block = {'hash': 'dd0b5974756421d8ac0b3e3689bfbfcc1834b3b66a497f219301e9b000000000', 
              'height': 0, 
              'messages': ['3010 rocks', 
                           'Warning:', 
@@ -110,9 +119,12 @@ def test_validate_block():
                    'timestamp': 1700636371}
     block80 = {'hash': '2fc329f7cbf06417158665c819d29f6ea1f41e6789c269ca6b6de8c000000000', 'height': 80, 'messages': ['Elstan', 'funmaking'], 'minedBy': 'GossipZilla!', 'nonce': '1458333614994197', 'timestamp': 1700823420}
     block79 = {'hash': '0eb8fd66cb4f1937f5ccfb1a661955bb42c7168ef300baef191e057000000000', 'height': 79, 'messages': ['PSI'], 'minedBy': 'GossipZilla!', 'nonce': '2500000301125418', 'timestamp': 1700822662}
-    print(f"MESSAGE {peer.validate_block_messages(block80['messages'])}")
-    print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
-    print(f"VALIDATE BLOCK {peer.validate_block(next_block, block)}")
+    # print(f"MESSAGE {peer.validate_block_messages(block80['messages'])}")
+    # print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
+    # print(f"VALIDATE BLOCK {peer.validate_block(next_block, block)}")
+
+    print(f"TEST BLOCK {peer_no_miner.get_block_hash(test_block, block)}")
+    
 
 def test_validate_chain():
     curr_chain = [
@@ -184,10 +196,10 @@ def main():
     # test_find_majority_hash()
     # test_getconsensuslist()
     # test_findmissingblock()
-    # test_validate_block()
+    test_validate_block()
     # test_validate_chain()
     # test_handleannounce()
-    test_mineblock()
+    # test_mineblock()
 
 
 
