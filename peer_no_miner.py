@@ -13,13 +13,13 @@ import sys
 # 4. Add Block (done)
 
 
-SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
+SILICON_HOST, SILICON_PORT = "192.168.101.248", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
-DIFFICULTY = 9
+DIFFICULTY = 8
 
 SOCKET_TIMEOUT = 0.01
 
@@ -651,7 +651,7 @@ def my_server(my_host, my_port):
                 # will do consensus if only have at least 3 peers
                 print(f"ELAPSE CONSENSUS:{elapse_time_consensus}")
                 if ((msg_type == "CONSENSUS" or elapse_time_consensus >= CONSENSUS_REPEAT_DURATION)
-                    and not is_consensus and len(peer_obj_list) >= 3):
+                    and not is_consensus and len(peer_obj_list) >= 1):
                     #starting consensus
                     is_consensus = True
                     # print("STARTING CONSENSUS 1 MIN")
@@ -710,7 +710,7 @@ def main():
 
     port = args.port
 
-    # my_host = "192.168.101.248"
+    my_host = "192.168.101.248"
     my_server(my_host, port)
 
 if __name__ == "__main__":
