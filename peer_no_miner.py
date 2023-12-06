@@ -6,9 +6,9 @@ import random
 import hashlib
 import argparse
 import sys
-# BUG:
-# 1. Get block timeout, not receiving replies
-# 2. consensus stat reply is null
+
+
+
 
 # SILICON_HOST, SILICON_PORT = "192.168.101.248", 8999
 SILICON_HOST, SILICON_PORT = "eagle.cs.umanitoba.ca", 8999
@@ -19,7 +19,7 @@ CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
 DIFFICULTY = 9
 
-SOCKET_TIMEOUT = 0.01
+SOCKET_TIMEOUT = 5
 
 consensus_peers = []
 my_chain = []
@@ -682,7 +682,7 @@ def handle_stats_reply(addr, server_socket):
 def my_server(my_host, my_port):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
         server_socket.bind((my_host, my_port))
-        # server_socket.settimeout(SOCKET_TIMEOUT)
+        server_socket.settimeout(SOCKET_TIMEOUT)
         
         print(f"Server listening on host {my_host} and PORT {my_port}")
 
@@ -741,11 +741,11 @@ def my_server(my_host, my_port):
                 # print(f"No activity in PEER SERVER for {SOCKET_TIMEOUT} seconds.")
                 pass
 
-            # except KeyError as e:
-            #     print(f"Key error {e}")
-            #     is_consensus = False
-            #     to_blacklist(addr)
-            #     pass
+            except KeyError as e:
+                print(f"Key error {e}")
+                is_consensus = False
+                to_blacklist(addr)
+                pass
                 
             except TypeError as e:
                 print(f"Type Error:. {e}")
@@ -757,12 +757,12 @@ def my_server(my_host, my_port):
                 is_consensus = False
                 pass
 
-            # except UnboundLocalError as e:
-            #     print(f"Unbound local error {e}")
-            #     is_consensus = False
+            except UnboundLocalError as e:
+                print(f"Unbound local error {e}")
+                is_consensus = False
 
-            # except ConnectionRefusedError as e:
-            #     print(f"Connection Refused {e}")
+            except ConnectionRefusedError as e:
+                print(f"Connection Refused {e}")
 
 
 def main():
