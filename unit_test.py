@@ -84,28 +84,8 @@ def test_findmissingblock():
         print(f"{block}")
 
 def test_validate_block():
-    test_block = {
-    'previous_hash': 'dd0b5974756421d8ac0b3e3689bfbfcc1834b3b66a497f219301e9b000000000',
-    'minedBy': 'Bryce!',
-    'nonce': 'b8UFVqxRE7NiluyHvyVe',
-    'messages': [
-        'tiptoeing', 'audiophiles', "wick's", 'alight', "crimp's", 'waif', 'aisles', 'Mahdi', 'Final3'
-    ],
-    'timestamp': 1701815848
-    }
-    block = {'hash': 'dd0b5974756421d8ac0b3e3689bfbfcc1834b3b66a497f219301e9b000000000', 
-             'height': 0, 
-             'messages': ['3010 rocks', 
-                          'Warning:', 
-                          'Procrastinators', 
-                          'will be sent back', 
-                          'in time to start', 
-                          'early.', 
-                          'Chain 2'], 
-             'minedBy': 'Prof!', 
-             'nonce': '742463477029129', 
-             'addr': '3',
-             'timestamp': 1700629652}
+    test_block = {'hash': 'c94101870f308e28e7ada1e98d46f58cffad3452c05175a7d44565d000000000', 'height': 2014, 'messages': ['subservience', "region's", "protÃ©gÃ©'s", "catchword's", 'affording', "bookmark's", 'grub', 'fizzing'], 'minedBy': 'Bryce', 'nonce': 'GQfaBI210APjUm8pb5vQ', 'timestamp': 1701741408, 'addr': ('130.179.28.122', 8755)}
+    block = {'hash': 'f916ed002a20454b6515e43aab622110674fb386d0c47f5251ae2f9000000000', 'height': 2013, 'messages': ['fun'], 'minedBy': 'leorize', 'nonce': '*Ic\x1dB:D\x12e?\x1a\x18U2K&', 'timestamp': 1701741360, 'addr': ('130.179.28.122', 8755)}
     
     next_block = {'hash': '5b0cc813303f305927dbaf559bebab19229ba30106687a61ed4c62d000000000', 
                   'height': 1, 
@@ -121,7 +101,7 @@ def test_validate_block():
     block79 = {'hash': '0eb8fd66cb4f1937f5ccfb1a661955bb42c7168ef300baef191e057000000000', 'height': 79, 'messages': ['PSI'], 'minedBy': 'GossipZilla!', 'nonce': '2500000301125418', 'timestamp': 1700822662}
     # print(f"MESSAGE {peer.validate_block_messages(block80['messages'])}")
     # print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
-    # print(f"VALIDATE BLOCK {peer.validate_block(next_block, block)}")
+    print(f"VALIDATE BLOCK {peer_no_miner.validate_block(test_block, block)}")
 
     print(f"TEST BLOCK {peer_no_miner.get_block_hash(test_block, block)}")
     

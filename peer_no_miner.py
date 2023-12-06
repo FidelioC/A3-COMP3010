@@ -12,21 +12,20 @@ import sys
 # 3. Create Chain (done)
 # 4. Add Block (done)
 
-# get missing blocks, didnt get any responds
-
-# SILICON_HOST, SILICON_PORT = "192.168.101.248", 8999
-SILICON_HOST, SILICON_PORT = "eagle.cs.umanitoba.ca", 8999
+SILICON_HOST, SILICON_PORT = "192.168.101.248", 8999
+# SILICON_HOST, SILICON_PORT = "eagle.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
-DIFFICULTY = 9
+DIFFICULTY = 1
 
 SOCKET_TIMEOUT = 0.01
 
 consensus_peers = []
 my_chain = []
+my_chain_valid = []
 chain_valid = False
 blacklisted_peers = []
 
@@ -61,6 +60,10 @@ class Peer:
         self.sock.sendto(json.dumps(gossip_message).encode(), (self.peer_host, self.peer_port))
 
     def forward_gossip_peer(self, message):
+        '''
+        FORWARDING MESSAGE EXACTLY ONCE, 
+        BY KEEPING TRACK OF THE SENT MESSAGES
+        '''
         if message not in self.sent_messages:
             # print(f"FORWARDING MESSAGE {message} to {self.peer_name} {self.peer_id}")
             self.sock.sendto(json.dumps(message).encode(), (self.peer_host, self.peer_port))
@@ -82,6 +85,53 @@ class Peer:
     
 peer_obj_list:Peer = []
 
+def to_blacklist(addr, blacklisted_list):
+    if addr not in blacklisted_list:
+        blacklisted_list.append(addr)
+
+def block_format(json_response):
+    block = {
+        "hash": json_response["hash"],
+        "height": json_response["height"],
+        "messages": json_response["messages"],
+        "minedBy": json_response["minedBy"],
+        "nonce": json_response["nonce"],
+        "timestamp": json_response["timestamp"]
+    }
+    return block
+
+def print_list(my_list):
+    for entry in my_list:
+        if entry != None:
+            print(entry)
+
+# check if peer inside list
+def is_peer_list(gossip_message):
+    gossip_id = gossip_message["id"]
+    for peer in peer_obj_list:
+        if peer.peer_id == gossip_id:
+            return True #true if duplicate
+    
+    #false if doesn't exist
+    return False 
+
+def is_peer_myself(gossip_message, my_host, my_port):
+    gossip_host = gossip_message["host"]
+    gossip_port = gossip_message["port"]
+
+    if gossip_host == my_host and gossip_port == my_port:
+        return True
+    else:
+        return False
+
+def get_peer_by_addr(peer_host, peer_port):
+    for peer in peer_obj_list:
+        if peer.peer_host == peer_host and peer.peer_port == peer_port:
+            return peer
+    
+    return None
+
+# ============ README: CLEAN PEERS CODE =====================
 def renew_timeout_peer(peer_id, peer_list):
     renew_peer:Peer = get_peer(peer_id, peer_list)
     if renew_peer != None:
@@ -108,32 +158,13 @@ def check_timeout(curr_peer:Peer, time):
         return True
     else:
         return False
+#==============================================================
 
-def print_list(my_list):
-    for entry in my_list:
-        if entry != None:
-            print(entry)
-
-# check if peer inside list
-def is_peer_list(gossip_message):
-    gossip_id = gossip_message["id"]
-    for peer in peer_obj_list:
-        if peer.peer_id == gossip_id:
-            return True #true if duplicate
-    
-    #false if doesn't exist
-    return False 
-
-def is_peer_myself(gossip_message, my_host, my_port):
-    gossip_host = gossip_message["host"]
-    gossip_port = gossip_message["port"]
-
-    if gossip_host == my_host and gossip_port == my_port:
-        return True
-    else:
-        return False
-
+#=========================README: GOSSIPING CODE HERE =======================
 def send_gossip_reply(my_host, my_port, server_socket, gossip_message):
+    '''
+    SENDING GOSSIP REPLY TO OTHER PEER
+    '''
     gossip_reply = {
         "type": "GOSSIP_REPLY",
         "host": my_host,
@@ -144,13 +175,6 @@ def send_gossip_reply(my_host, my_port, server_socket, gossip_message):
     host_original = gossip_message["host"]
     port_original = gossip_message["port"]
     server_socket.sendto(json.dumps(gossip_reply).encode(), (host_original,port_original))
-
-def get_peer_by_addr(peer_host, peer_port):
-    for peer in peer_obj_list:
-        if peer.peer_host == peer_host and peer.peer_port == peer_port:
-            return peer
-    
-    return None
 
 def add_peer_list(my_host, my_port, gossip_message, sock):
     # add peer to list if not in list and not myself
@@ -164,6 +188,9 @@ def add_peer_list(my_host, my_port, gossip_message, sock):
         peer_obj_list.append(peer_object)
 
 def foward_messages(gossip_message, my_host, my_port):
+    '''
+    FORWARDING MESSAGES TO ALL PEERS
+    '''
     for peer in peer_obj_list:
         #ignore own messages
         if not is_peer_myself(gossip_message, my_host, my_port):
@@ -171,9 +198,10 @@ def foward_messages(gossip_message, my_host, my_port):
 
 def do_gossip(my_host, my_port, server_socket, json_response):
     # print("INSIDE GOSSIP")
-    #handle peers -> renew peer timeout or remove peer
     # print(f"CURRENT TIME: {time.time()}")
     peer_id = json_response["id"]
+
+    ''' README: handle peers -> renew peer timeout or remove peer '''
     renew_timeout_peer(peer_id, peer_obj_list)
     remove_peer(peer_obj_list, time.time())
 
@@ -188,6 +216,9 @@ def do_gossip(my_host, my_port, server_socket, json_response):
     # print(print_peers())
 
 def ping_gossip(my_host, my_port, elapsed_time):
+    '''
+    PING GOSSIP, 'keep-alive'
+    '''
     # gossip to 3 different random hosts from list
     if elapsed_time >= GOSSIP_REPEAT_DURATION and len(peer_obj_list) > 2:
         random_hosts = random.sample(peer_obj_list, 2)
@@ -195,6 +226,11 @@ def ping_gossip(my_host, my_port, elapsed_time):
         for host in random_hosts:
             host.gossip(my_host, my_port)
         return True
+
+
+#==============================================================
+
+#=======================README: COLLECT ALL BLOCKS CODE ===========================
 
 def send_stats():
     # print("INSIDE STATS")
@@ -208,27 +244,10 @@ def save_stats_reply(addr, json_response, stats_replies):
     json_response["port"] = addr[1]
     stats_replies.append(json_response)
 
-def do_consensus(stats_replies):
-    '''
-    do consensus. 
-    get lists of peers by majority of longest chain
-    '''
-    print("DOING CONSENSUS")
-    
-    consensus_list = get_consensus_list(stats_replies)
-
-    # try:
-    # for list in consensus_list:
-        # print(f"{list} \n")
-    
-    return consensus_list
-    # except TypeError as e:
-    #     print(f"Type Error:. {e}")
-    #     pass
-
 def do_getallblocks(my_host, my_port, server_socket, consensus_list):
     '''
     get block from peers in a load balance way
+    using round robin
     '''
     # try:
     if consensus_list != None and len(consensus_list) > 0:
@@ -253,13 +272,9 @@ def do_getallblocks(my_host, my_port, server_socket, consensus_list):
 
 def handle_getblock_reply(my_host, my_port, server_socket):
     '''
-    after receiving the 1st get block reply, 
-    we want to make timeout and see how many replies we got in a time.
+    we want to make timeout and see how many replies we got in an interval
     validate and resend if there's block missing
     '''
-    # consensus -> request all blocks -> receive blocks -> missing blocks request
-    # insert 1st get block
-    # insert_block(addr_first, json_response)
     finish_getblock_time = time.time() + GETBLOCK_DURATION
     while time.time() <= finish_getblock_time:
         #try getting any data during this time
@@ -282,25 +297,28 @@ def handle_getblock_reply(my_host, my_port, server_socket):
             # to_blacklist(addr, blacklisted_peers)
         except KeyError as e:
             print(f"Key error {e}")
+        except TypeError as e:
+            print(f"Type error {e}")
+            pass
 
     print("FINISHED RECEIVING REPLY BLOCKS ")
     # print("MY CURRENT CHAIN: ")
     # for block in my_chain:
     #     print(f"{block}\n")
 
-    #check current chain
+    # check current chain
     missing_blocks = find_missing_blocks(my_chain, consensus_peers[0]["height"])
+    # request missing blocks
     check_req_blocks(my_host, my_port, server_socket, missing_blocks)
     
-
 def check_req_blocks(my_host, my_port, server_socket, missing_blocks):
     # request missing blocks until all filled,
-    # request will be sent, and will be received back in the main loop
-    # then, check missing blocks again
+    # if there's missing blocks, need to handle get block reply
     if len(missing_blocks) > 0:
         print(f"MISSING BLOCKS FOUND {missing_blocks} \n WITH LENGTH: {len(missing_blocks)}")
         request_missing_blocks(missing_blocks, consensus_peers)
         handle_getblock_reply(my_host, my_port, server_socket)
+    # AFTER GETTING ALL BLOCKS, VALIDATE CHAIN
     else:
         print(f"VALIDATING CHAIN")
         print("MY CURRENT CHAIN: ")
@@ -312,26 +330,15 @@ def check_req_blocks(my_host, my_port, server_socket, missing_blocks):
         if chain_valid:
             global chain_updated
             chain_updated = True
-            
             return True
         else:
             return False
     # print(f"CHAIN VALIDATION {chain_valid}")
 
-   
-
-def block_format(json_response):
-    block = {
-        "hash": json_response["hash"],
-        "height": json_response["height"],
-        "messages": json_response["messages"],
-        "minedBy": json_response["minedBy"],
-        "nonce": json_response["nonce"],
-        "timestamp": json_response["timestamp"]
-    }
-    return block
-
 def insert_block(addr, get_block_reply):
+    '''
+    INSERT BLOCKS TO MY CHAIN
+    '''
     print(f"INSERTING BLOCKS {get_block_reply}")
     block_height = get_block_reply["height"]
 
@@ -350,6 +357,9 @@ def insert_block(addr, get_block_reply):
             my_chain.insert(index, new_block)
 
 def find_missing_blocks(current_chain, target_height):
+    '''
+    FINDING MISSING BLOCKS WITH THE TARGETED HEIGHT
+    '''
     missing_blocks = []
     for i in range(len(current_chain) - 1):
         current_element = current_chain[i]["height"]
@@ -378,6 +388,7 @@ def request_missing_blocks(missing_blocks, consensus_list):
     total_missing = len(missing_blocks)
     # if there's missing blocks
     if total_missing > 0:
+        random.shuffle(consensus_list)
         curr_index = 0
         # load balance get block request
         while(curr_index < total_missing):
@@ -388,40 +399,7 @@ def request_missing_blocks(missing_blocks, consensus_list):
                         peer_obj.send_getblock(missing_blocks[curr_index])
                     curr_index += 1 
     
-    
-def get_consensus_list(stats_replies):
-    return find_majority_hash(find_max_height(stats_replies))
-
-def find_max_height(stats_replies):
-    # Find the maximum height
-    # try:
-    valid_entries = [entry for entry in stats_replies if entry['height'] is not None]
-
-    if len(valid_entries) > 0:
-        max_height = max(entry['height'] for entry in valid_entries)
-        return [entry for entry in valid_entries if entry['height'] == max_height]
-    # except TypeError as e:
-    #     print(f"Type Error:. {e}")
-    #     pass
-
-
-def find_majority_hash(stats_replies):
-    hash_counts = {}
-    # try:
-    if stats_replies != None:
-        for entry in stats_replies:
-            current_hash = entry['hash']
-            hash_counts[current_hash] = hash_counts.get(current_hash, 0) + 1
-        # Find the majority hash
-        majority_hash = max(hash_counts, key=hash_counts.get)
-        # Filter entries with the majority hash
-        entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
-        return entries_with_majority_hash
-    # except TypeError as e:
-    #     print(f"Type Error:. {e}")
-    #     pass
-
-
+# ======================= README: VALIDATING/VERIFY CHAIN CODE ===================================
 def validate_chain(current_chain):
     '''
     chain validation here.
@@ -472,11 +450,13 @@ def get_block_hash(current_block, prev_block):
     hashBase.update(block_minedby.encode()) 
     # messages
     for message in block_messages: 
-        hashBase.update(message.encode())
+        if message != None:
+            hashBase.update(message.encode())
     # time
-    hashBase.update(block_time.to_bytes(8,'big'))
+    if block_time != None:
+        hashBase.update(block_time.to_bytes(8,'big'))
     # nonce
-    hashBase.update(block_nonce.encode())
+    hashBase.update(str(block_nonce).encode())
    
     # print(f"generated hash {hashBase.hexdigest()}")
     # print(f"current hash {current_block['hash']}")
@@ -507,59 +487,9 @@ def validate_block(current_block, prev_block):
             # blacklist bad peer
             to_blacklist(block_addr, blacklisted_peers)
         return False
+# =================================================================
 
-def handle_response(addr, my_host, my_port, server_socket, json_response):
-    msg_type = json_response["type"]
-    if msg_type == "GOSSIP":
-        do_gossip(my_host, my_port, server_socket, json_response)
-    elif msg_type == "STATS" and len(my_chain) > 0:
-        handle_stats_reply(addr, server_socket)
-    elif msg_type == "GET_BLOCK" and chain_valid:
-        handle_getblock(addr, server_socket, json_response)
-    elif msg_type == "ANNOUNCE" and chain_valid:
-        handle_announce(json_response, my_chain)
-
-def handle_announce(json_response, current_chain):
-    del json_response["type"]
-    new_block = json_response
-    # validate block with the last block
-    if len(current_chain) > 0:
-        is_validated = validate_block(new_block, current_chain[len(my_chain)-1])
-        if is_validated:
-            current_chain.append(new_block)
-            return True
-        else:
-            return False
-    
-def handle_getblock(addr, server_socket, json_response):
-    height_requested = json_response["height"]
-    block_reply = {}
-    if height_requested in range(len(my_chain)):
-        block_reply = my_chain[height_requested]
-        block_reply = block_format(block_reply)
-        block_reply["type"] = "GET_BLOCK_REPLY"
-    else:
-        block_reply = {   
-            'type': 'GET_BLOCK_REPLY',
-            'hash': 'None',
-            'height': 'None',
-            'messages': 'None',
-            'minedBy': 'None',
-            'nonce': 'None',
-            'timestamp': 'None',
-        }
-    
-    server_socket.sendto(json.dumps(block_reply).encode(), (addr[0], addr[1]))
-
-def handle_stats_reply(addr, server_socket):
-    stats_reply_msg = {
-        "type": "STATS_REPLY",
-        "height": len(my_chain),
-        "hash": my_chain[len(my_chain)-1]["hash"] 
-    }
-    print(f"SENDING STATS REPLY: {stats_reply_msg} TO {addr}")
-    server_socket.sendto(json.dumps(stats_reply_msg).encode(), (addr[0], addr[1]))
-
+# =================== README: CONSENSUS CODE =======================
 def check_reply_mychain(consensus_list):
     '''
     check if my chain is still in sync with others chain
@@ -577,7 +507,50 @@ def check_reply_mychain(consensus_list):
     #     print(f"Type Error:. {e}")
     #     pass
 
+def get_consensus_list(stats_replies):
+    '''
+    RETURNING THE MOST AGREED CHAIN PEER LISTS
+    '''
+    return find_majority_hash(find_max_height(stats_replies))
+
+def find_max_height(stats_replies):
+    '''
+    FINDING THE MAXIMUM HEIGHT FROM ALL TRACKED PEERS
+    '''
+    # Find the maximum height
+    # try:
+    valid_entries = [entry for entry in stats_replies if entry['height'] is not None]
+
+    if len(valid_entries) > 0:
+        max_height = max(entry['height'] for entry in valid_entries)
+        return [entry for entry in valid_entries if entry['height'] == max_height]
+    # except TypeError as e:
+    #     print(f"Type Error:. {e}")
+    #     pass
+
+def find_majority_hash(stats_replies):
+    '''
+    FINDING THE MAJORITY HASH FROM ALL TRACKED PEERS
+    '''
+    hash_counts = {}
+    # try:
+    if stats_replies != None:
+        for entry in stats_replies:
+            current_hash = entry['hash']
+            hash_counts[current_hash] = hash_counts.get(current_hash, 0) + 1
+        # Find the majority hash
+        majority_hash = max(hash_counts, key=hash_counts.get)
+        # Filter entries with the majority hash
+        entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
+        return entries_with_majority_hash
+    # except TypeError as e:
+    #     print(f"Type Error:. {e}")
+    #     pass
+
 def handle_consensus(my_host, my_port, server_socket, json_response):
+    '''
+    README: DOING CONSENSUS HERE
+    '''
     finish_consensus_time = time.time() + CONSENSUS_DURATION
     # send stats to all peers at once
     send_stats()
@@ -612,10 +585,11 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
     print("FINISHED RECEIVING REPLIES STATS")
 
     #after getting all stats reply, do consensus
-    consensus_list = do_consensus(stats_replies)
+    consensus_list = get_consensus_list(stats_replies)
     global consensus_peers
     consensus_peers = consensus_list
     
+    # if consensus peers list is none, try doing another consensus
     print(f"CONSENSUS PEERS: {consensus_peers}")
     if consensus_peers is not None:
         for peer in consensus_peers:
@@ -623,7 +597,8 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
     else:
         return -CONSENSUS_REPEAT_DURATION
 
-    # check with my chain whether chain is same or no
+    # check with my chain whether chain is same or no,
+    # no need to get all blocks if chain are the same
     global chain_valid
     if not check_reply_mychain(consensus_list):
         #get all blocks
@@ -633,13 +608,67 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
         my_chain = []
         do_getallblocks(my_host, my_port, server_socket, consensus_list)
     else:
+        global my_chain_valid
+        my_chain_valid = my_chain
         chain_valid = True
     
     return time.time()
 
-def to_blacklist(addr, blacklisted_list):
-    if addr not in blacklisted_list:
-        blacklisted_list.append(addr)
+# =================================================================
+
+# =================== HANDLE NORMAL RESPONSE =======================
+def handle_response(addr, my_host, my_port, server_socket, json_response):
+    msg_type = json_response["type"]
+    if msg_type == "GOSSIP":
+        do_gossip(my_host, my_port, server_socket, json_response)
+    elif msg_type == "STATS" and len(my_chain_valid) > 0:
+        handle_stats_reply(addr, server_socket)
+    elif msg_type == "GET_BLOCK" and chain_valid:
+        handle_getblock(addr, server_socket, json_response)
+    elif msg_type == "ANNOUNCE" and chain_valid:
+        handle_announce(json_response, my_chain)
+
+def handle_getblock(addr, server_socket, json_response):
+    height_requested = json_response["height"]
+    block_reply = {}
+    if height_requested in range(len(my_chain)):
+        block_reply = my_chain[height_requested]
+        block_reply = block_format(block_reply)
+        block_reply["type"] = "GET_BLOCK_REPLY"
+    else:
+        block_reply = {   
+            'type': 'GET_BLOCK_REPLY',
+            'hash': 'None',
+            'height': 'None',
+            'messages': 'None',
+            'minedBy': 'None',
+            'nonce': 'None',
+            'timestamp': 'None',
+        }
+    
+    server_socket.sendto(json.dumps(block_reply).encode(), (addr[0], addr[1]))
+
+def handle_announce(json_response, current_chain):
+    del json_response["type"]
+    new_block = json_response
+    # validate block with the last block
+    if len(current_chain) > 0:
+        is_validated = validate_block(new_block, current_chain[len(my_chain)-1])
+        if is_validated:
+            current_chain.append(new_block)
+            return True
+        else:
+            return False
+
+def handle_stats_reply(addr, server_socket):
+    stats_reply_msg = {
+        "type": "STATS_REPLY",
+        "height": len(my_chain_valid),
+        "hash": my_chain_valid[len(my_chain_valid)-1]["hash"] 
+    }
+    print(f"SENDING STATS REPLY: {stats_reply_msg} TO {addr}")
+    server_socket.sendto(json.dumps(stats_reply_msg).encode(), (addr[0], addr[1]))
+# =================================================================
 
 def my_server(my_host, my_port):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
@@ -683,8 +712,8 @@ def my_server(my_host, my_port):
                 #handle consensus or repeat consensus every 1 min 
                 # will do consensus if only have at least 3 peers
                 print(f"ELAPSE CONSENSUS:{elapse_time_consensus}")
-                if ((msg_type == "CONSENSUS" or elapse_time_consensus >= CONSENSUS_REPEAT_DURATION)
-                    and not is_consensus and len(peer_obj_list) >= 1):
+                if ((msg_type == "CONSENSUS" or elapse_time_consensus >= CONSENSUS_REPEAT_DURATION or not chain_valid)
+                    and not is_consensus and len(peer_obj_list) >= 2):
                     #starting consensus
                     is_consensus = True
                     # print("STARTING CONSENSUS 1 MIN")
@@ -692,11 +721,6 @@ def my_server(my_host, my_port):
                     start_time_consensus = handle_consensus(my_host, my_port, server_socket, json_response)
                     # finished consensus
                     is_consensus = False
-                # elif msg_type == "GET_BLOCK_REPLY":
-                #     # if still getting block, dont do another consensus
-                #     time_offset = 5
-                #     get_block_result = handle_getblock_reply(addr, my_host, my_port, server_socket, json_response)
-                #     print(f"GET BLOCK RESULT {get_block_result}")
                 else: #handle any other response
                     handle_response(addr, my_host, my_port, server_socket, json_response)
 
@@ -743,7 +767,7 @@ def main():
 
     port = args.port
 
-    # my_host = "192.168.101.248"
+    my_host = "192.168.101.248"
     my_server(my_host, port)
 
 if __name__ == "__main__":
