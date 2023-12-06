@@ -6,20 +6,18 @@ import random
 import hashlib
 import argparse
 import sys
-# TODO:
-# 1. GOSSIP (done)
-# 2. Consensus (done)
-# 3. Create Chain (done)
-# 4. Add Block (done)
+# BUG:
+# 1. Get block timeout, not receiving replies
+# 2. consensus stat reply is null
 
-SILICON_HOST, SILICON_PORT = "192.168.101.248", 8999
-# SILICON_HOST, SILICON_PORT = "eagle.cs.umanitoba.ca", 8999
+# SILICON_HOST, SILICON_PORT = "192.168.101.248", 8999
+SILICON_HOST, SILICON_PORT = "eagle.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
-DIFFICULTY = 1
+DIFFICULTY = 9
 
 SOCKET_TIMEOUT = 0.01
 
@@ -445,18 +443,23 @@ def get_block_hash(current_block, prev_block):
 
     # prev hash
     if prev_block != None: #ignore if genesis
-        hashBase.update(prev_block['hash'].encode()) 
+        if prev_block['hash'] != None:
+            hashBase.update(prev_block['hash'].encode()) 
     # mined by 
-    hashBase.update(block_minedby.encode()) 
+    if block_minedby != None:
+        hashBase.update(block_minedby.encode()) 
+
     # messages
-    for message in block_messages: 
-        if message != None:
-            hashBase.update(message.encode())
+    if block_messages != None:
+        for message in block_messages: 
+            if message != None:
+                hashBase.update(message.encode())
     # time
     if block_time != None:
         hashBase.update(block_time.to_bytes(8,'big'))
-    # nonce
-    hashBase.update(str(block_nonce).encode())
+    if block_nonce != None:
+        # nonce
+        hashBase.update(str(block_nonce).encode())
    
     # print(f"generated hash {hashBase.hexdigest()}")
     # print(f"current hash {current_block['hash']}")
@@ -518,34 +521,36 @@ def find_max_height(stats_replies):
     FINDING THE MAXIMUM HEIGHT FROM ALL TRACKED PEERS
     '''
     # Find the maximum height
-    # try:
-    valid_entries = [entry for entry in stats_replies if entry['height'] is not None]
+    try:
+        valid_entries = [entry for entry in stats_replies if entry['height'] is not None 
+                         and entry['height'] != 'null'
+                         and entry ['height'] != 'None']
 
-    if len(valid_entries) > 0:
-        max_height = max(entry['height'] for entry in valid_entries)
-        return [entry for entry in valid_entries if entry['height'] == max_height]
-    # except TypeError as e:
-    #     print(f"Type Error:. {e}")
-    #     pass
+        if len(valid_entries) > 0:
+            max_height = max(int(entry['height']) for entry in valid_entries)
+            return [entry for entry in valid_entries if entry['height'] == max_height]
+    except TypeError as e:
+        print(f"Type Error:. {e.with_traceback()}")
+        # sys.exit()
 
 def find_majority_hash(stats_replies):
     '''
     FINDING THE MAJORITY HASH FROM ALL TRACKED PEERS
     '''
     hash_counts = {}
-    # try:
-    if stats_replies != None:
-        for entry in stats_replies:
-            current_hash = entry['hash']
-            hash_counts[current_hash] = hash_counts.get(current_hash, 0) + 1
-        # Find the majority hash
-        majority_hash = max(hash_counts, key=hash_counts.get)
-        # Filter entries with the majority hash
-        entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
-        return entries_with_majority_hash
-    # except TypeError as e:
-    #     print(f"Type Error:. {e}")
-    #     pass
+    try:
+        if stats_replies != None:
+            for entry in stats_replies:
+                current_hash = entry['hash']
+                hash_counts[current_hash] = hash_counts.get(current_hash, 0) + 1
+            # Find the majority hash
+            majority_hash = max(hash_counts, key=hash_counts.get)
+            # Filter entries with the majority hash
+            entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
+            return entries_with_majority_hash
+    except TypeError as e:
+        print(f"Type Error:. {e.__traceback__}")
+        # sys.exit()
 
 def handle_consensus(my_host, my_port, server_socket, json_response):
     '''
@@ -569,9 +574,6 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
             # save stats_reply
             if msg_type == "STATS_REPLY" and addr not in blacklisted_peers:
                 save_stats_reply(addr, json_response, stats_replies)
-                print("STATS REPLY: ")
-                for stat in stats_replies:
-                    print(f"{stat} \n")
             #handle other requests, but dont handle other consensus
             elif msg_type != "STATS_REPLY" and msg_type != "CONSENSUS": 
                 handle_response(addr, my_host, my_port, server_socket, json_response)
@@ -583,7 +585,9 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
 
     
     print("FINISHED RECEIVING REPLIES STATS")
-
+    print("STATS REPLY: ")
+    for stat in stats_replies:
+        print(f"{stat} \n")
     #after getting all stats reply, do consensus
     consensus_list = get_consensus_list(stats_replies)
     global consensus_peers
@@ -607,9 +611,9 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
         global my_chain
         my_chain = []
         do_getallblocks(my_host, my_port, server_socket, consensus_list)
-    else:
         global my_chain_valid
         my_chain_valid = my_chain
+    else:
         chain_valid = True
     
     return time.time()
@@ -724,7 +728,7 @@ def my_server(my_host, my_port):
                 else: #handle any other response
                     handle_response(addr, my_host, my_port, server_socket, json_response)
 
-                print(f"CHAIN VALID: {chain_valid} with length: {len(my_chain)}")
+                print(f"CHAIN VALID: {chain_valid} with length: {len(my_chain_valid)}")
                 print(f"BLACKLISTED PEERS: {blacklisted_peers}\n")
                 print(f"CONSENSUS PEERS: {consensus_peers}")
 
@@ -767,7 +771,7 @@ def main():
 
     port = args.port
 
-    my_host = "192.168.101.248"
+    # my_host = "192.168.101.248"
     my_server(my_host, port)
 
 if __name__ == "__main__":
