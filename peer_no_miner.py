@@ -248,6 +248,9 @@ def do_getallblocks(my_host, my_port, server_socket, consensus_list):
     using round robin
     '''
     # try:
+    # see if there's any timeout, peer. Don't request from them if yes.
+    remove_peer(peer_obj_list, time.time())
+
     if consensus_list != None and len(consensus_list) > 0:
         curr_height = 0
         max_height = consensus_list[0]["height"]
@@ -353,6 +356,8 @@ def insert_block(addr, get_block_reply):
             new_block["addr"] = addr
             #insert block
             my_chain.insert(index, new_block)
+    else:
+        to_blacklist(addr, blacklisted_peers)
 
 def find_missing_blocks(current_chain, target_height):
     '''
