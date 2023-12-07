@@ -372,23 +372,24 @@ def find_missing_blocks(current_chain, target_height):
     FINDING MISSING BLOCKS WITH THE TARGETED HEIGHT
     '''
     missing_blocks = []
-    for i in range(len(current_chain) - 1):
-        current_element = current_chain[i]["height"]
-        next_element = current_chain[i + 1]["height"]
+    if len(current_chain) != target_height:
+        for i in range(len(current_chain) - 1):
+            current_element = current_chain[i]["height"]
+            next_element = current_chain[i + 1]["height"]
 
-        # Check if there is a gap between current_element and next_element
-        if next_element - current_element > 1:
-            # Insert missing block into the result list
-            for block in range(current_element + 1, next_element):
-                missing_blocks.append(block)
-    
-    # print(current_chain[len(current_chain) - 1])
-    if len(current_chain) > 0:
-        max_height = current_chain[len(current_chain) - 1]["height"]
-        # print(max_height)
-        if max_height < target_height:
-            for i in range(max_height+1, target_height):
-                missing_blocks.append(i)
+            # Check if there is a gap between current_element and next_element
+            if next_element - current_element > 1:
+                # Insert missing block into the result list
+                for block in range(current_element + 1, next_element):
+                    missing_blocks.append(block)
+        
+        # print(current_chain[len(current_chain) - 1])
+        if len(current_chain) > 0:
+            max_height = current_chain[len(current_chain) - 1]["height"]
+            # print(max_height)
+            if max_height < target_height:
+                for i in range(max_height+1, target_height):
+                    missing_blocks.append(i)
 
     return missing_blocks
 
@@ -457,30 +458,33 @@ def get_block_hash(current_block, prev_block):
     # get block hash
     hashBase = hashlib.sha256()
 
-    # prev hash
-    if prev_block != None: #ignore if genesis
-        if prev_block['hash'] != None:
-            hashBase.update(prev_block['hash'].encode()) 
-    # mined by 
-    if block_minedby != None:
-        hashBase.update(block_minedby.encode()) 
+    if block_minedby == None or block_messages == None or block_time == None or block_nonce == None:
+        return -1
+    else:
+        # prev hash
+        if prev_block != None: #ignore if genesis
+            if prev_block['hash'] != None:
+                hashBase.update(prev_block['hash'].encode()) 
+        # mined by 
+        if block_minedby != None:
+            hashBase.update(block_minedby.encode()) 
 
-    # messages
-    if block_messages != None:
-        for message in block_messages: 
-            if message != None:
-                hashBase.update(message.encode())
-    # time
-    if block_time != None:
-        hashBase.update(block_time.to_bytes(8,'big'))
-    if block_nonce != None:
-        # nonce
-        hashBase.update(str(block_nonce).encode())
-   
-    # print(f"generated hash {hashBase.hexdigest()}")
-    # print(f"current hash {current_block['hash']}")
+        # messages
+        if block_messages != None:
+            for message in block_messages: 
+                if message != None:
+                    hashBase.update(message.encode())
+        # time
+        if block_time != None:
+            hashBase.update(block_time.to_bytes(8,'big'))
+        if block_nonce != None:
+            # nonce
+            hashBase.update(str(block_nonce).encode())
+    
+        # print(f"generated hash {hashBase.hexdigest()}")
+        # print(f"current hash {current_block['hash']}")
 
-    return hashBase.hexdigest()
+        return hashBase.hexdigest()
 
 def validate_block(current_block, prev_block):
     print(f"VALIDATING BLOCK {current_block}")
@@ -775,6 +779,10 @@ def my_server(my_host, my_port):
             except KeyboardInterrupt as e:
                 print(f"Program stopped. Keyboard Interrupt {e}")
                 sys.exit()
+            
+            except Exception as e:
+                print(f"Something bad happened as {e}")
+                is_consensus = False
 
 
 def main():
