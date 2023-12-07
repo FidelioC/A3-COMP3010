@@ -17,9 +17,10 @@ GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
+ALLBLOCKS_DURATION = 10
 DIFFICULTY = 9
 
-SOCKET_TIMEOUT = 5
+SOCKET_TIMEOUT = 10
 
 consensus_peers = []
 my_chain = []
@@ -257,7 +258,7 @@ def do_getallblocks(my_host, my_port, server_socket, consensus_list):
         print(f"DO GETTING ALL BLOCKS FROM: {consensus_list}\n MAX HEIGHT: {max_height}")
         print_list(peer_obj_list)
         # load balance get block request
-        while(curr_height <= max_height):
+        while(curr_height < max_height):
             for peer in consensus_list:
                 peer_obj = get_peer_by_addr(peer["host"], peer["port"])
                 peer_addr = (peer["host"], peer["port"])
@@ -265,17 +266,22 @@ def do_getallblocks(my_host, my_port, server_socket, consensus_list):
                     peer_obj.send_getblock(curr_height)
                 curr_height += 1
         
-        handle_getblock_reply(my_host, my_port, server_socket)
+        get_blocks_timeout = time.time() + ALLBLOCKS_DURATION
+        handle_getblock_reply(my_host, my_port, server_socket, get_blocks_timeout)
     
     # except TypeError as e:
     #     print(f"Type Error:. {e}")
     #     pass
 
-def handle_getblock_reply(my_host, my_port, server_socket):
+def handle_getblock_reply(my_host, my_port, server_socket, get_blocks_timeout):
     '''
     we want to make timeout and see how many replies we got in an interval
     validate and resend if there's block missing
     '''
+    print(f"GETTING BLOCKS TIMEOUT: {get_blocks_timeout}. \nCURRENT TIME: {time.time()}")
+    if time.time() >= get_blocks_timeout:
+        return
+    
     finish_getblock_time = time.time() + GETBLOCK_DURATION
     while time.time() <= finish_getblock_time:
         #try getting any data during this time
@@ -289,6 +295,7 @@ def handle_getblock_reply(my_host, my_port, server_socket):
             print(f"\nReceived From {addr}, \ndata: {json_response}")
             msg_type = json_response["type"]
             if msg_type == "GET_BLOCK_REPLY":
+                get_blocks_timeout += GETBLOCK_DURATION # give more time if still receiving get blocks
                 insert_block(addr, json_response)
             else:
                 # handle any other response
@@ -300,7 +307,7 @@ def handle_getblock_reply(my_host, my_port, server_socket):
             print(f"Key error {e}")
         except TypeError as e:
             print(f"Type error {e}")
-            pass
+
 
     print("FINISHED RECEIVING REPLY BLOCKS ")
     # print("MY CURRENT CHAIN: ")
@@ -310,15 +317,15 @@ def handle_getblock_reply(my_host, my_port, server_socket):
     # check current chain
     missing_blocks = find_missing_blocks(my_chain, consensus_peers[0]["height"])
     # request missing blocks
-    check_req_blocks(my_host, my_port, server_socket, missing_blocks)
+    check_req_blocks(my_host, my_port, server_socket, missing_blocks, get_blocks_timeout)
     
-def check_req_blocks(my_host, my_port, server_socket, missing_blocks):
+def check_req_blocks(my_host, my_port, server_socket, missing_blocks, get_blocks_timeout):
     # request missing blocks until all filled,
     # if there's missing blocks, need to handle get block reply
     if len(missing_blocks) > 0:
         print(f"MISSING BLOCKS FOUND {missing_blocks} \n WITH LENGTH: {len(missing_blocks)}")
         request_missing_blocks(missing_blocks, consensus_peers)
-        handle_getblock_reply(my_host, my_port, server_socket)
+        handle_getblock_reply(my_host, my_port, server_socket, get_blocks_timeout)
     # AFTER GETTING ALL BLOCKS, VALIDATE CHAIN
     else:
         print(f"VALIDATING CHAIN")
@@ -343,7 +350,7 @@ def insert_block(addr, get_block_reply):
     print(f"INSERTING BLOCKS {get_block_reply}")
     block_height = get_block_reply["height"]
 
-    if block_height != 'None':
+    if block_height != 'None' or block_height != None:
         existing_block = next((block for block in my_chain if block["height"] == block_height and block["hash"] == get_block_reply["hash"]), None)
 
         # find index to insert block
@@ -535,7 +542,7 @@ def find_max_height(stats_replies):
             max_height = max(int(entry['height']) for entry in valid_entries)
             return [entry for entry in valid_entries if entry['height'] == max_height]
     except TypeError as e:
-        print(f"Type Error:. {e.with_traceback()}")
+        print(f"Type Error:. {e}")
         # sys.exit()
 
 def find_majority_hash(stats_replies):
@@ -554,7 +561,7 @@ def find_majority_hash(stats_replies):
             entries_with_majority_hash = [entry for entry in stats_replies if entry['hash'] == majority_hash]
             return entries_with_majority_hash
     except TypeError as e:
-        print(f"Type Error:. {e.__traceback__}")
+        print(f"Type Error:. {e}")
         # sys.exit()
 
 def handle_consensus(my_host, my_port, server_socket, json_response):
@@ -586,7 +593,7 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
                 print("CANT HANDLE OTHER CONSENSUS")
         except TypeError as e:
             to_blacklist(addr, blacklisted_peers)
-            print(f"Key error {e}")
+            print(f"Type error {e}")
 
     
     print("FINISHED RECEIVING REPLIES STATS")
@@ -616,8 +623,9 @@ def handle_consensus(my_host, my_port, server_socket, json_response):
         global my_chain
         my_chain = []
         do_getallblocks(my_host, my_port, server_socket, consensus_list)
-        global my_chain_valid
-        my_chain_valid = my_chain
+        if chain_valid:
+            global my_chain_valid
+            my_chain_valid = my_chain
     else:
         chain_valid = True
     
@@ -682,7 +690,7 @@ def handle_stats_reply(addr, server_socket):
 def my_server(my_host, my_port):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as server_socket:
         server_socket.bind((my_host, my_port))
-        server_socket.settimeout(SOCKET_TIMEOUT)
+        # server_socket.settimeout(SOCKET_TIMEOUT)
         
         print(f"Server listening on host {my_host} and PORT {my_port}")
 
@@ -722,7 +730,7 @@ def my_server(my_host, my_port):
                 # will do consensus if only have at least 3 peers
                 print(f"ELAPSE CONSENSUS:{elapse_time_consensus}")
                 if ((msg_type == "CONSENSUS" or elapse_time_consensus >= CONSENSUS_REPEAT_DURATION or not chain_valid)
-                    and not is_consensus and len(peer_obj_list) >= 2):
+                    and not is_consensus and len(peer_obj_list) >= 1):
                     #starting consensus
                     is_consensus = True
                     # print("STARTING CONSENSUS 1 MIN")
@@ -737,9 +745,10 @@ def my_server(my_host, my_port):
                 print(f"BLACKLISTED PEERS: {blacklisted_peers}\n")
                 print(f"CONSENSUS PEERS: {consensus_peers}")
 
-            except socket.timeout:
-                # print(f"No activity in PEER SERVER for {SOCKET_TIMEOUT} seconds.")
-                pass
+            # except socket.timeout:
+            #     print(f"No activity in PEER SERVER for {SOCKET_TIMEOUT} seconds.")
+            #     is_consensus = False
+            #     pass
 
             except KeyError as e:
                 print(f"Key error {e}")
