@@ -10,8 +10,8 @@ import sys
 
 
 
-# SILICON_HOST, SILICON_PORT = "192.168.101.248", 8999
-SILICON_HOST, SILICON_PORT = "eagle.cs.umanitoba.ca", 8999
+
+SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
@@ -763,6 +763,9 @@ def my_server(my_host, my_port):
 
             except ConnectionRefusedError as e:
                 print(f"Connection Refused {e}")
+
+            except KeyboardInterrupt as e:
+                print(f"Program stopped. Keyboard Interrupt {e}")
 
 
 def main():

@@ -9,6 +9,7 @@
 - To **run** the program:
 
   - just type in 'python3 peer_no_miner.py [port_number]'
+  - Note: MAKE SURE to CHANGE THE SILICON HOST/ WELLKNOWN HOST in the constant
 
 - To make things easier:
 
