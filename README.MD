@@ -70,3 +70,15 @@
   - How does the timeout work:
     1. when adding new peer, it will have time.time() + TIMEOUT.
     2. Then, in every gossip that's received, it will remove and clean up the peers if the current time is > time.time() + TIMEOUT.
+
+# 4. Validating Chain
+- Where: 
+  - Line numbers: 414-513
+
+  - File name: peer_no_miner.py
+
+- How:
+  - First, it will try to get all the blocks.
+  - Re-request if there's missing blocks.
+  - If all blocks are filled, then validate the chain at once, block-by-block.
+  - blacklist the peer that sent an invalid block.
