@@ -745,11 +745,6 @@ def my_server(my_host, my_port):
                 print(f"BLACKLISTED PEERS: {blacklisted_peers}\n")
                 print(f"CONSENSUS PEERS: {consensus_peers}")
 
-            # except socket.timeout:
-            #     print(f"No activity in PEER SERVER for {SOCKET_TIMEOUT} seconds.")
-            #     is_consensus = False
-            #     pass
-
             except KeyError as e:
                 print(f"Key error {e}")
                 is_consensus = False
