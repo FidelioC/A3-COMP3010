@@ -766,6 +766,7 @@ def my_server(my_host, my_port):
 
             except KeyboardInterrupt as e:
                 print(f"Program stopped. Keyboard Interrupt {e}")
+                sys.exit()
 
 
 def main():
