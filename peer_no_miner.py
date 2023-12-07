@@ -15,9 +15,7 @@ CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
 ALLBLOCKS_DURATION = 10
-DIFFICULTY = 9
-
-SOCKET_TIMEOUT = 10
+DIFFICULTY = 8
 
 consensus_peers = []
 my_chain = []
@@ -350,21 +348,25 @@ def insert_block(addr, get_block_reply):
     print(f"INSERTING BLOCKS {get_block_reply}")
     block_height = get_block_reply["height"]
     print(f"BLOCK HEIGHT IS {block_height}")
-    if block_height is not 'None' or block_height is not None:
-        existing_block = next((block for block in my_chain if block["height"] == block_height and block["hash"] == get_block_reply["hash"]), None)
+    try:
+        if block_height != 'None' or block_height is not None or block_height != 'null':
+            existing_block = next((block for block in my_chain if block["height"] == block_height and block["hash"] == get_block_reply["hash"]), None)
 
-        # find index to insert block
-        if existing_block is None:
-            index = 0
-            while index < len(my_chain) and my_chain[index]["height"] < block_height:
-                index += 1
+            # find index to insert block
+            if existing_block is None:
+                index = 0
+                while index < len(my_chain) and my_chain[index]["height"] < block_height:
+                    index += 1
 
-            new_block = block_format(get_block_reply)
-            new_block["addr"] = addr
-            #insert block
-            my_chain.insert(index, new_block)
-    else:
-        print(f"BLOCK IS NONE, BLACKLISTING PEER {addr}")
+                new_block = block_format(get_block_reply)
+                new_block["addr"] = addr
+                #insert block
+                my_chain.insert(index, new_block)
+        else:
+            print(f"BLOCK IS NONE, BLACKLISTING PEER {addr}")
+            to_blacklist(addr, blacklisted_peers)
+    except TypeError as e:
+        print(f"TYPE ERROR as {e}")
         to_blacklist(addr, blacklisted_peers)
 
 def find_missing_blocks(current_chain, target_height):
@@ -410,6 +412,7 @@ def request_missing_blocks(missing_blocks, consensus_list):
                     if peer_obj != None:
                         peer_obj.send_getblock(missing_blocks[curr_index])
                     curr_index += 1 
+               
     
 # ======================= README: VALIDATING/VERIFY CHAIN CODE ===================================
 def validate_chain(current_chain):
@@ -541,17 +544,24 @@ def find_max_height(stats_replies):
     FINDING THE MAXIMUM HEIGHT FROM ALL TRACKED PEERS
     '''
     # Find the maximum height
-    try:
-        valid_entries = [entry for entry in stats_replies if entry['height'] is not None 
-                         and entry['height'] != 'null'
-                         and entry ['height'] != 'None']
+    valid_entries = []
+      
+    for entry in stats_replies:
+        try:
+            height = entry['height']
+            if height is not None and height != 'null' and height != 'None':
+                valid_entries.append(entry)
 
-        if len(valid_entries) > 0:
-            max_height = max(int(entry['height']) for entry in valid_entries)
-            return [entry for entry in valid_entries if entry['height'] == max_height]
-    except TypeError as e:
-        print(f"Type Error:. {e}")
-        # sys.exit()
+            if len(valid_entries) > 0:
+                max_height = max(int(entry['height']) for entry in valid_entries)
+                return [entry for entry in valid_entries if entry['height'] == max_height]
+        
+        except KeyError as e:
+            print(f"Key Error:. {e}")
+            to_blacklist((entry["host"], entry["port"]), blacklisted_peers)
+        except TypeError as e:
+            print(f"Type Error:. {e}")
+            # sys.exit()
 
 def find_majority_hash(stats_replies):
     '''
@@ -756,11 +766,11 @@ def my_server(my_host, my_port):
             except KeyError as e:
                 print(f"Key error {e}")
                 is_consensus = False
-                to_blacklist(addr)
+                to_blacklist(addr, blacklisted_peers)
                 pass
                 
             except TypeError as e:
-                print(f"Type Error:. {e}")
+                print(f"Type Error in main: {e}")
                 is_consensus = False
                 pass
             

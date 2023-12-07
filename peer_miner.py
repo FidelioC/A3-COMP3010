@@ -9,16 +9,17 @@ import sys
 import miner
 import select
 # "192.168.101.248"
-SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
+SILICON_HOST, SILICON_PORT =  "192.168.101.248", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
 ALLBLOCKS_DURATION = 10
-DIFFICULTY = 9
+DIFFICULTY = 1
 
-SOCKET_TIMEOUT = 10
+SOCKET_TIMEOUT = 0.01
+chain_updated = False
 
 consensus_peers = []
 my_chain = []
@@ -77,6 +78,9 @@ class Peer:
         print(f"SENDING GET_BLOCK MSG: {get_block_msg} TO {self.peer_name, self.peer_host, self.peer_port}")
 
         self.sock.sendto(json.dumps(get_block_msg).encode(), (self.peer_host, self.peer_port))
+
+    def send_announce(self, announce_msg):
+        print(f"SENDING ANNOUNCE MSG: {announce_msg} TO {self.peer_name, self.peer_host, self.peer_port}")
 
     def __str__(self):
         return str(self.to_json())
@@ -525,6 +529,8 @@ def check_reply_mychain(consensus_list):
             if (consensus_list[0]["height"] == len(my_chain) 
                 and consensus_list[0]["hash"] == my_chain[len(my_chain)-1]["hash"]):
                 return True
+            elif len(my_chain_valid) >= consensus_list[0]["height"]: 
+                return True
             else:
                 return False
 
@@ -659,6 +665,8 @@ def handle_response(addr, my_host, my_port, server_socket, json_response):
         handle_getblock(addr, server_socket, json_response)
     elif msg_type == "ANNOUNCE" and chain_valid:
         handle_announce(json_response, my_chain)
+    elif msg_type == "NEW_WORD":
+        send_tcp_request(json_response, my_host, my_port)
 
 def handle_getblock(addr, server_socket, json_response):
     height_requested = json_response["height"]
@@ -726,6 +734,7 @@ def send_maxblock_miner(my_host, my_port):
 def send_announce(json_response, peers_list):
     msg_type = json_response["type"]
     if msg_type == "ANNOUNCE":
+        handle_announce(json_response, my_chain_valid)
         for peer in peers_list:
             peer.send_announce(json_response)
 
@@ -897,8 +906,8 @@ def main():
     port = args.port
     miners = parse_miners(args.workers)
 
-    # my_host = "192.168.101.248"
-    my_server(my_host, port)
+    my_host = "192.168.101.248"
+    my_server(my_host, port, miners)
 
 if __name__ == "__main__":
     main()

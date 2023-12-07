@@ -10,6 +10,7 @@
 
   - just type in 'python3 peer_no_miner.py [port_number]'
   - Note: MAKE SURE to CHANGE THE SILICON HOST/ WELLKNOWN HOST in the constant
+  - Note: MAKE SURE to CHANGE the DIFFICULTY constant with the chain difficulty that you want test.
 
 - To make things easier:
 
@@ -42,7 +43,7 @@
 
 - Where:
 
-  - Line numbers: 512-639.
+  - Line numbers: 518-652.
 
     - You can also find it by searching this 'README: CONSENSUS CODE'
 
@@ -58,7 +59,7 @@
 
 - Where:
 
-  - Line numbers: 130-157
+  - Line numbers: 128-155
 
     - You can also find it by searching this 'README: CLEAN PEERS CODE'
 
@@ -73,7 +74,9 @@
 
 # 4. Validating Chain
 - Where: 
-  - Line numbers: 414-513
+  - Line numbers: 417-516
+  
+    - You can also find it by searching this 'README: VALIDATING/VERIFY CHAIN CODE
 
   - File name: peer_no_miner.py
 
