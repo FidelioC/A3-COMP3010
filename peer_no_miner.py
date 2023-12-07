@@ -10,7 +10,7 @@ import sys
 
 
 
-
+# "192.168.101.248"
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
@@ -279,7 +279,8 @@ def handle_getblock_reply(my_host, my_port, server_socket, get_blocks_timeout):
     validate and resend if there's block missing
     '''
     print(f"GETTING BLOCKS TIMEOUT: {get_blocks_timeout}. \nCURRENT TIME: {time.time()}")
-    if time.time() >= get_blocks_timeout:
+    if get_blocks_timeout <= time.time():
+        print("GETTING BLOCKS TIMED OUT")
         return
     
     finish_getblock_time = time.time() + GETBLOCK_DURATION
@@ -295,7 +296,7 @@ def handle_getblock_reply(my_host, my_port, server_socket, get_blocks_timeout):
             print(f"\nReceived From {addr}, \ndata: {json_response}")
             msg_type = json_response["type"]
             if msg_type == "GET_BLOCK_REPLY":
-                get_blocks_timeout += GETBLOCK_DURATION # give more time if still receiving get blocks
+                get_blocks_timeout = time.time() + ALLBLOCKS_DURATION # give more time if still receiving get blocks
                 insert_block(addr, json_response)
             else:
                 # handle any other response
@@ -420,6 +421,9 @@ def validate_chain(current_chain):
     5. And the hash has the correct difficulty
     '''
     is_validated = True
+    if len(current_chain) == 0:
+        return False
+    
     for i in range(len(current_chain)):
         current_block = current_chain[i]
         if i == 0:
