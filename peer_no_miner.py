@@ -7,9 +7,6 @@ import hashlib
 import argparse
 import sys
 
-
-
-
 # "192.168.101.248"
 SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60

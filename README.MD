@@ -42,7 +42,7 @@
 
 - Where:
 
-  - Line numbers: 500-626.
+  - Line numbers: 512-639.
 
     - You can also find it by searching this 'README: CONSENSUS CODE'
 
@@ -58,7 +58,7 @@
 
 - Where:
 
-  - Line numbers: 132-159
+  - Line numbers: 130-157
 
     - You can also find it by searching this 'README: CLEAN PEERS CODE'
 
