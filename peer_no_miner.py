@@ -217,6 +217,8 @@ def ping_gossip(my_host, my_port, elapsed_time):
     '''
     # gossip to 3 different random hosts from list
     if elapsed_time >= GOSSIP_REPEAT_DURATION and len(peer_obj_list) > 2:
+        # clean up every 30 secs
+        remove_peer(peer_obj_list, time.time()) 
         random_hosts = random.sample(peer_obj_list, 2)
         # print(f"GOSSIPING TO: {random_hosts}")
         for host in random_hosts:
@@ -347,8 +349,8 @@ def insert_block(addr, get_block_reply):
     '''
     print(f"INSERTING BLOCKS {get_block_reply}")
     block_height = get_block_reply["height"]
-
-    if block_height != 'None' or block_height != None:
+    print(f"BLOCK HEIGHT IS {block_height}")
+    if block_height is not 'None' or block_height is not None:
         existing_block = next((block for block in my_chain if block["height"] == block_height and block["hash"] == get_block_reply["hash"]), None)
 
         # find index to insert block
@@ -362,6 +364,7 @@ def insert_block(addr, get_block_reply):
             #insert block
             my_chain.insert(index, new_block)
     else:
+        print(f"BLOCK IS NONE, BLACKLISTING PEER {addr}")
         to_blacklist(addr, blacklisted_peers)
 
 def find_missing_blocks(current_chain, target_height):

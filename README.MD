@@ -66,6 +66,7 @@
 
 - How:
   - inside the do_gossip() method. It will always either remove a peer when it reaches a timeout, renew a peer, or add a new peer to my peer list.
+  - Also it will try to clean peers every 30 seconds, inside the ping_gossip() function.
   - How does the timeout work:
     1. when adding new peer, it will have time.time() + TIMEOUT.
     2. Then, in every gossip that's received, it will remove and clean up the peers if the current time is > time.time() + TIMEOUT.
