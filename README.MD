@@ -85,3 +85,33 @@
   - Re-request if there's missing blocks.
   - If all blocks are filled, then validate the chain at once, block-by-block.
   - blacklist the peer that sent an invalid block.
+
+
+# 5. Rubric Codes Function Location
+- Send GOSSIP to join network. Repeat GOSSIP message every minute, sent to up to 3 of your known peers (send to fewer if you don't have 3 peers).
+    - Function name: do_gossip() and ping_gossip()
+
+- Reply to GOSSIP message with GOSSIP-REPLY
+    - Function name: send_gossip_reply()
+
+- Clean up peers that have not sent GOSSIP messages (note to students: consider writing where and how you do this in your readme)
+    - Function name: remove_peer()
+
+- Collect blocks in a load-balanced way
+    - Function name: do_getallblocks() and request_missing_blocks()
+  
+- Verify entire chain (Write how and where in readme)
+    - Function name: validate_chain()
+
+- Add new block to top of chain on ANNOUNCE
+    - Function name: handle_announce()
+
+- Send STATS to all known peers, collect results
+    - Function name: handle_consensus(), send_stats() and save_stats_reply()
+  
+- Choose longest chain (Ties break on which is the majority), or longest chain (ties break on majority). write in README where this code is
+    - Function name: get_consensus_list()
+
+- Do consensus when entering network to choose the consensus'd chain. GET_BLOCK functions after doing consensus and collecting/verifying chain
+    - Function name: do_getallblocks()
+

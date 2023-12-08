@@ -9,14 +9,14 @@ import sys
 import miner
 import select
 # "192.168.101.248"
-SILICON_HOST, SILICON_PORT =  "192.168.101.248", 8999
+SILICON_HOST, SILICON_PORT =  "silicon.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
 CONSENSUS_DURATION = 1
 GETBLOCK_DURATION = 1
 ALLBLOCKS_DURATION = 10
-DIFFICULTY = 1
+DIFFICULTY = 8
 
 SOCKET_TIMEOUT = 0.01
 chain_updated = False
@@ -356,21 +356,25 @@ def insert_block(addr, get_block_reply):
     print(f"INSERTING BLOCKS {get_block_reply}")
     block_height = get_block_reply["height"]
     print(f"BLOCK HEIGHT IS {block_height}")
-    if block_height is not 'None' or block_height is not None:
-        existing_block = next((block for block in my_chain if block["height"] == block_height and block["hash"] == get_block_reply["hash"]), None)
+    try:
+        if block_height != 'None' or block_height is not None or block_height != 'null':
+            existing_block = next((block for block in my_chain if block["height"] == block_height and block["hash"] == get_block_reply["hash"]), None)
 
-        # find index to insert block
-        if existing_block is None:
-            index = 0
-            while index < len(my_chain) and my_chain[index]["height"] < block_height:
-                index += 1
+            # find index to insert block
+            if existing_block is None:
+                index = 0
+                while index < len(my_chain) and my_chain[index]["height"] < block_height:
+                    index += 1
 
-            new_block = block_format(get_block_reply)
-            new_block["addr"] = addr
-            #insert block
-            my_chain.insert(index, new_block)
-    else:
-        print(f"BLOCK IS NONE, BLACKLISTING PEER {addr}")
+                new_block = block_format(get_block_reply)
+                new_block["addr"] = addr
+                #insert block
+                my_chain.insert(index, new_block)
+        else:
+            print(f"BLOCK IS NONE, BLACKLISTING PEER {addr}")
+            to_blacklist(addr, blacklisted_peers)
+    except TypeError as e:
+        print(f"TYPE ERROR as {e}")
         to_blacklist(addr, blacklisted_peers)
 
 def find_missing_blocks(current_chain, target_height):
@@ -549,17 +553,24 @@ def find_max_height(stats_replies):
     FINDING THE MAXIMUM HEIGHT FROM ALL TRACKED PEERS
     '''
     # Find the maximum height
-    try:
-        valid_entries = [entry for entry in stats_replies if entry['height'] is not None 
-                         and entry['height'] != 'null'
-                         and entry ['height'] != 'None']
+    valid_entries = []
+      
+    for entry in stats_replies:
+        try:
+            height = entry['height']
+            if height is not None and height != 'null' and height != 'None':
+                valid_entries.append(entry)
 
-        if len(valid_entries) > 0:
-            max_height = max(int(entry['height']) for entry in valid_entries)
-            return [entry for entry in valid_entries if entry['height'] == max_height]
-    except TypeError as e:
-        print(f"Type Error:. {e}")
-        # sys.exit()
+            if len(valid_entries) > 0:
+                max_height = max(int(entry['height']) for entry in valid_entries)
+                return [entry for entry in valid_entries if entry['height'] == max_height]
+        
+        except KeyError as e:
+            print(f"Key Error:. {e}")
+            to_blacklist((entry["host"], entry["port"]), blacklisted_peers)
+        except TypeError as e:
+            print(f"Type Error:. {e}")
+            # sys.exit()
 
 def find_majority_hash(stats_replies):
     '''
@@ -667,6 +678,8 @@ def handle_response(addr, my_host, my_port, server_socket, json_response):
         handle_announce(json_response, my_chain)
     elif msg_type == "NEW_WORD":
         send_tcp_request(json_response, my_host, my_port)
+    elif msg_type == "MAX_BLOCK":
+        send_maxblock_miner(my_host, my_port)
 
 def handle_getblock(addr, server_socket, json_response):
     height_requested = json_response["height"]
@@ -696,6 +709,8 @@ def handle_announce(json_response, current_chain):
         is_validated = validate_block(new_block, current_chain[len(my_chain)-1])
         if is_validated:
             current_chain.append(new_block)
+            global chain_updated
+            chain_updated = True
             return True
         else:
             return False
@@ -714,18 +729,29 @@ def handle_stats_reply(addr, server_socket):
 def send_tcp_request(json_response, my_host, my_port):
     print(f"\nSENDING TCP REQUEST TO PEER:\n {json_response}")
     request_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    request_socket.connect((my_host, my_port))
-    request_socket.send(json.dumps(json_response).encode())
+    request_socket.settimeout(SOCKET_TIMEOUT)
+    try:
+        request_socket.connect((my_host, my_port))
+        request_socket.send(json.dumps(json_response).encode())
+    except socket.timeout:
+        print("socket timeout")
+    finally:
+        request_socket.close()
+        
 
 def send_request_miner(json_response, miners_list):
     msg_type = json_response["type"]
+    start_nonce = 0
     miners_socket = []
     for entry in miners_list:
+        json_response['nonce_start'] = start_nonce
+        if msg_type == "NEW_WORD":
+            start_nonce += 999999999999999999999999999999999999999/2
         miners_socket.append(entry.req_newword_miner(json_response))
     return miners_socket
 
 def send_maxblock_miner(my_host, my_port):
-    max_block = my_chain[len(my_chain)-1]
+    max_block = my_chain_valid[len(my_chain_valid)-1]
     max_block["type"] = "MAX_BLOCK"
     #send current max block to miner
     send_tcp_request(max_block, my_host, my_port)
@@ -735,6 +761,7 @@ def send_announce(json_response, peers_list):
     msg_type = json_response["type"]
     if msg_type == "ANNOUNCE":
         handle_announce(json_response, my_chain_valid)
+        json_response['type'] = "ANNOUNCE"
         for peer in peers_list:
             peer.send_announce(json_response)
 
@@ -864,7 +891,7 @@ def my_server(my_host, my_port, miners):
             except KeyError as e:
                 print(f"Key error {e}")
                 is_consensus = False
-                to_blacklist(addr)
+                to_blacklist(addr, blacklisted_peers)
                 pass
                 
             except TypeError as e:
@@ -906,7 +933,7 @@ def main():
     port = args.port
     miners = parse_miners(args.workers)
 
-    my_host = "192.168.101.248"
+    # my_host = "192.168.101.249"
     my_server(my_host, port, miners)
 
 if __name__ == "__main__":

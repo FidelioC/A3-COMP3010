@@ -8,7 +8,7 @@ import argparse
 import sys
 
 # "192.168.101.248"
-SILICON_HOST, SILICON_PORT = "silicon.cs.umanitoba.ca", 8999
+SILICON_HOST, SILICON_PORT = "eagle.cs.umanitoba.ca", 8999
 TIMEOUT = 60
 GOSSIP_REPEAT_DURATION = 20
 CONSENSUS_REPEAT_DURATION = 60
@@ -214,10 +214,13 @@ def ping_gossip(my_host, my_port, elapsed_time):
     PING GOSSIP, 'keep-alive'
     '''
     # gossip to 3 different random hosts from list
-    if elapsed_time >= GOSSIP_REPEAT_DURATION and len(peer_obj_list) > 2:
+    if elapsed_time >= GOSSIP_REPEAT_DURATION:
         # clean up every 30 secs
         remove_peer(peer_obj_list, time.time()) 
-        random_hosts = random.sample(peer_obj_list, 2)
+        if len(peer_obj_list) > 2:
+            random_hosts = random.sample(peer_obj_list, 2)
+        else:
+            random_hosts = random.sample(peer_obj_list, 1)
         # print(f"GOSSIPING TO: {random_hosts}")
         for host in random_hosts:
             host.gossip(my_host, my_port)
@@ -525,6 +528,8 @@ def check_reply_mychain(consensus_list):
         if len(consensus_list) > 0 and len(my_chain) > 0:
             if (consensus_list[0]["height"] == len(my_chain) 
                 and consensus_list[0]["hash"] == my_chain[len(my_chain)-1]["hash"]):
+                return True
+            elif len(my_chain_valid) >= consensus_list[0]["height"]: 
                 return True
             else:
                 return False

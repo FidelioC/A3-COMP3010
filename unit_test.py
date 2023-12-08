@@ -99,11 +99,25 @@ def test_validate_block():
                    'timestamp': 1700636371}
     block80 = {'hash': '2fc329f7cbf06417158665c819d29f6ea1f41e6789c269ca6b6de8c000000000', 'height': 80, 'messages': ['Elstan', 'funmaking'], 'minedBy': 'GossipZilla!', 'nonce': '1458333614994197', 'timestamp': 1700823420}
     block79 = {'hash': '0eb8fd66cb4f1937f5ccfb1a661955bb42c7168ef300baef191e057000000000', 'height': 79, 'messages': ['PSI'], 'minedBy': 'GossipZilla!', 'nonce': '2500000301125418', 'timestamp': 1700822662}
+    
+    prev_block = {   'hash': '7d04464769f93fde871f1fa9e5c0c0874a94a444822f4dbfb27e7c7d09976c20',
+    'height': 343,
+    'messages': ['testannounce'],
+    'minedBy': 'Prof!',
+    'nonce': '6446110839462',
+    'timestamp': 1701981756,}
+    my_block = {   'hash': '0dd66f47a67fc53226dc478d60530757fb19bd40a72c983d09ef9a01a8ed2d40',
+    'height': 344,
+    'messages': ['o'],
+    'minedBy': 'Bowser Jr.',
+    'nonce': '6446110839492',
+    'timestamp': 1701982929,
+    }
     # print(f"MESSAGE {peer.validate_block_messages(block80['messages'])}")
     # print(f"NONCE {peer.validate_block_nonce(block80['nonce'])}")
-    print(f"VALIDATE BLOCK {peer_no_miner.validate_block(test_block, block)}")
+    print(f"VALIDATE BLOCK {peer_no_miner.validate_block(my_block, prev_block)}")
 
-    print(f"TEST BLOCK {peer_no_miner.get_block_hash(test_block, block)}")
+    print(f"TEST BLOCK {peer_no_miner.get_block_hash(my_block, prev_block)}")
     
 
 def test_validate_chain():

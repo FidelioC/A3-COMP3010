@@ -134,6 +134,19 @@ class TestShell(cmd.Cmd):
             print("Error sending")
             print(e)
 
+    def do_maxblock(self, arg):
+        try:
+            content = {
+                "type": "MAX_BLOCK",
+            }
+
+            self.sock.sendto(json.dumps(content).encode(),
+                             (self.hostname, self.port))
+            # has no reply
+        except Exception as e:
+            print("Error sending")
+            print(e)
+
     def do_get(self, arg):
         '''
         get a single link from the chain. Usage get id
